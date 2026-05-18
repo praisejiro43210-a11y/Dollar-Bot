@@ -98,37 +98,21 @@ function getImageUrl(prompt) {
 // Auto-Reply AI (Human-like)
 async function autoReplyAI(jid, text) {
   const history = memory.getHistory(jid, 'autoreply');
-  history.push({ role: 'user', content: text });
-  
   const messages = [
     { role: 'system', content: 'You are a real human chatting casually on WhatsApp. You are not an AI assistant. Be brief, use lowercase mostly, act natural, and be friendly. Never reveal you are a bot.' },
-    ...history.slice(-10) // Keep last 10 messages for context
+    ...history.slice(-10), // Keep last 10 messages for context
+    { role: 'user', content: text }
   ];
 
   let responseText = '';
   try {
-    // Primary: Pollinations
-    const res = await fetch('https://text.pollinations.ai/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages, model: 'openai', private: true }),
-      timeout: 30000,
-    });
-    if (!res.ok) throw new Error('Pollinations failed');
-    responseText = (await res.text()).trim();
+    responseText = await textGenerate(messages, 'openai');
   } catch (err) {
-    console.log('[AutoReply] Pollinations failed, falling back to Puter AI...');
-    // Backup: Puter AI (via Kastg / DuckDuckGo free proxy)
-    try {
-      const prompt = `You are a human chatting on WhatsApp. Reply naturally to: ${text}`;
-      const backupRes = await fetch(`https://api.kastg.xyz/api/ai/chatgptV4?prompt=${encodeURIComponent(prompt)}`);
-      const backupData = await backupRes.json();
-      responseText = backupData.result[0].response.trim();
-    } catch (e2) {
-      responseText = "Yeah, totally."; // Ultimate fallback
-    }
+    console.log('[AutoReply] AI completely failed, using fallback...');
+    responseText = "Yeah, totally."; // Ultimate fallback
   }
 
+  history.push({ role: 'user', content: text });
   history.push({ role: 'assistant', content: responseText });
   memory.saveHistory(jid, 'autoreply', history);
   return responseText;

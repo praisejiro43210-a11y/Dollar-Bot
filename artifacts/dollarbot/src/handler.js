@@ -237,8 +237,8 @@ async function handleMessage(sock, msg) {
         const emojis = ['🔥', '❤️', '👍', '😍', '👏', '💯', '✨'];
         const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
         try {
-          // React to the status using the original sender's key
-          await sock.sendMessage(jid, {
+          // React to the status using the original participant's JID
+          await sock.sendMessage(msg.key.participant || msg.key.remoteJid, {
             react: { text: randomEmoji, key: msg.key }
           });
         } catch (_) {}

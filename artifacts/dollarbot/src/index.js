@@ -63,7 +63,8 @@ async function startBot(method, phone) {
   banner();
 
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
-  const { version } = await fetchLatestBaileysVersion();
+  // Hardcode WhatsApp version to fix the "old version of WhatsApp" / "waiting for this message" errors
+  const version = [2, 3000, 1015901307];
   const hasSession = fs.existsSync(path.join(AUTH_DIR, 'creds.json'));
 
   let usePairing = method;
