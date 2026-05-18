@@ -61,7 +61,7 @@ const userCommands = {
         `┃ ✦ Usage    : ${ram.usedGB}GB / ${ram.totalGB}GB\n` +
         `┃ ✦ AutoReply: ${autoReply}\n` +
         `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
-        `«⚡ Developed By Dollar\n⚡ Powered By Cortex & Mera AI»`,
+        `«⚡ Developed By Dollar\n⚡ Powered By Dollar Engine»`,
     });
   },
 
@@ -114,9 +114,9 @@ const userCommands = {
         `┃ ✦ Engine    : ${config.engine}\n` +
         `┃ ✦ Mode      : Public\n` +
         `┃ ✦ Library   : Baileys\n` +
-        `┃ ✦ AI        : Pollinations\n` +
+        `┃ ✦ AI        : Dollar AI\n` +
         `┃ ✦ Platform  : WhatsApp\n` +
-        `┃ ✦ TTS       : Pollinations 🔊\n` +
+        `┃ ✦ Voice     : Dollar Voice\n` +
         `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
         `📖 Type *.menu* to see all commands.\n` +
         `💵 DollarBot V5 — Smart • Fast • Limitless`,

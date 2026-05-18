@@ -21,7 +21,7 @@ const aiCommands = {
           `Example: .cortex explain quantum entanglement`,
       });
     }
-    await sock.sendMessage(jid, { text: '🧠 *Cortex is processing...*' });
+    await sock.sendMessage(jid, { text: '*Thinking...*' });
     try {
       const response = await pollinations.cortex(jid, args.join(' '));
       await sock.sendMessage(jid, {
@@ -117,7 +117,7 @@ const aiCommands = {
     await sock.sendMessage(jid, { text: '🌍 *Fetching weather...*' });
     try {
       const result = await pollinations.getWeather(args.join(' '));
-      await sock.sendMessage(jid, { text: `🌤️ *Weather Report*\n\n${result}\n\n⚡ Powered by DollarBot` });
+      await sock.sendMessage(jid, { text: `*Weather Report*\n\n${result}\n\n⚡ Powered by DollarBot` });
     } catch (e) {
       await sock.sendMessage(jid, { text: `❌ Weather Error: ${e.message}` });
     }
@@ -137,7 +137,7 @@ const aiCommands = {
       });
     }
     const prompt = args.join(' ');
-    await sock.sendMessage(jid, { text: `🎨 *Generating:* "${prompt}"\n⏳ This may take 15-30 seconds...` });
+    await sock.sendMessage(jid, { text: `*Generating Image:* "${prompt}"\n⏳ This may take 15-30 seconds...` });
     try {
       const imageUrl = pollinations.getImageUrl(prompt);
       const response = await fetch(imageUrl, { timeout: 60000 });
@@ -145,7 +145,7 @@ const aiCommands = {
       const buffer = await response.buffer();
       await sock.sendMessage(jid, {
         image: buffer,
-        caption: `🎨 *AI Generated Image*\n📝 Prompt: ${prompt}\n\n⚡ Powered by Pollinations AI`,
+        caption: `*Generated Image*\nPrompt: ${prompt}\n\n⚡ Powered by Dollar Engine`,
       });
     } catch (e) {
       await sock.sendMessage(jid, { text: `❌ Image Error: ${e.message}` });
@@ -159,7 +159,7 @@ const aiCommands = {
     await sock.sendMessage(jid, { text: '🌐 *Translating...*' });
     try {
       const result = await pollinations.translate(args.join(' '));
-      await sock.sendMessage(jid, { text: `🌐 *Translation Result*\n\n${result}\n\n⚡ Powered by DollarBot` });
+      await sock.sendMessage(jid, { text: `*Translation Result*\n\n${result}\n\n⚡ Powered by DollarBot` });
     } catch (e) {
       await sock.sendMessage(jid, { text: `❌ Translation Error: ${e.message}` });
     }

@@ -251,7 +251,7 @@ async function handleMessage(sock, msg) {
         const pingMsg = await sock.sendMessage(jid, { text: '⏳ Loading menu...' });
         const speed = Date.now() - cmdStart;
         await sendMenu(sock, jid, speed);
-       
+        break;
       }
 
       // ── User ──────────────────────────────────────────────────────────────

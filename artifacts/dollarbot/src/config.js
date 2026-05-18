@@ -6,7 +6,7 @@ const config = {
   version: '5.0.0',
   prefix: '.',
   mode: 'public',
-  engine: 'Groq & Canopy AI', // Updated Engine
+  engine: 'Dollar Engine V5', // Hiding backend info
 
   ownerJid: '14378898269@s.whatsapp.net',
 
