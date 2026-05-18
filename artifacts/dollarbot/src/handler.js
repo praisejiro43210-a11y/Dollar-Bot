@@ -3,22 +3,60 @@ const path = require('path');
 
 const config = require('./config');
 const store = require('./lib/store');
-const memory = require('./lib/memory');
 
-const userCommands = require('./commands/user');
-const ownerCommands = require('./commands/owner');
-const aiCommands = require('./commands/ai');
-const funCommands = require('./commands/fun');
+const userCommands    = require('./commands/user');
+const ownerCommands   = require('./commands/owner');
+const aiCommands      = require('./commands/ai');
+const funCommands     = require('./commands/fun');
 const utilityCommands = require('./commands/utility');
-const gameCommands = require('./commands/games');
-const groupCommands = require('./commands/group');
-const searchCommands = require('./commands/search');
+const gameCommands    = require('./commands/games');
+const groupCommands   = require('./commands/group');
+const searchCommands  = require('./commands/search');
 
-const LINK_REGEX = /(?:https?:\/\/|www\.|chat\.whatsapp\.com\/)[^\s]+/gi;
-const MENU_IMAGE_PATH = path.join(__dirname, '../assets/menu.jpg');
+const LINK_RE = /(?:https?:\/\/|www\.|chat\.whatsapp\.com\/)[^\s]+/gi;
+const MENU_IMG = path.join(__dirname, '../assets/menu.jpg');
 
-function getMenuText() {
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function extractBody(msg) {
   return (
+    msg.message?.conversation ||
+    msg.message?.extendedTextMessage?.text ||
+    msg.message?.imageMessage?.caption ||
+    msg.message?.videoMessage?.caption ||
+    msg.message?.buttonsResponseMessage?.selectedButtonId ||
+    msg.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
+    ''
+  );
+}
+
+function extractSender(msg, isGroup) {
+  return isGroup
+    ? (msg.key.participant || msg.key.remoteJid)
+    : msg.key.remoteJid;
+}
+
+function isOwnerJid(sender) {
+  if (!sender) return false;
+  const bare = sender.split('@')[0].split(':')[0];
+  return bare === config.ownerNumber || sender === config.ownerJid;
+}
+
+async function isBotAdmin(sock, jid) {
+  try {
+    const meta = await sock.groupMetadata(jid);
+    const botBare = (sock.user?.id || '').split(':')[0].split('@')[0];
+    return meta.participants.some(p => {
+      const pBare = p.id.split(':')[0].split('@')[0];
+      return pBare === botBare && !!p.admin;
+    });
+  } catch {
+    return false;
+  }
+}
+
+async function sendMenu(sock, jid) {
+  const caption =
     `╭━━━〔 💵 𝐃𝐎𝐋𝐋𝐀𝐑𝐁𝐎𝐓 𝐕5 〕━━━⬣\n` +
     `┃ ✦ Owner   : ${config.ownerName}\n` +
     `┃ ✦ Country : ${config.ownerCountry}\n` +
@@ -37,7 +75,7 @@ function getMenuText() {
     `┃ .say .sendto .react .delete\n` +
     `┃ .autoreply .vv .broadcast .shutdown\n` +
     `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
-    `╭━━━〔 🧠 AI 〕━━━⬣\n` +
+    `╭━━━〔 🧠 AI (with memory) 〕━━━⬣\n` +
     `┃ .cortex .mera .codeai .roast\n` +
     `┃ .complimentai .weather .imagine\n` +
     `┃ .translate .clear\n` +
@@ -54,67 +92,41 @@ function getMenuText() {
     `╭━━━〔 🛠️ UTILITY 〕━━━⬣\n` +
     `┃ .calculate .genpass .encode\n` +
     `┃ .decode .qr .tinyurl .pingweb\n` +
+    `┃ .tts <text>\n` +
     `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
     `╭━━━〔 🎮 GAMES 〕━━━⬣\n` +
     `┃ .coin .dice .rps .math\n` +
     `┃ .guess .slot .tictactoe\n` +
     `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
-    `╭━━━〔 👥 GROUP 〕━━━⬣\n` +
+    `╭━━━〔 👥 GROUP (admin) 〕━━━⬣\n` +
     `┃ .kick .promote .demote .mute\n` +
     `┃ .unmute .tagall .everyone\n` +
     `┃ .hidetag .grouplink .groupinfo\n` +
     `┃ .antilink .welcome\n` +
     `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
     `╭━━━〔 🚀 STATUS 〕━━━⬣\n` +
-    `┃ DollarBot Online & Stable ✅\n` +
+    `┃ Online & Stable ✅\n` +
     `┃ AI Memory Active 🧠\n` +
     `┃ Search Engine Ready 🔍\n` +
-    `┃ Security Level : High 🔒\n` +
+    `┃ TTS Powered by Pollinations 🔊\n` +
     `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
-    `«💵 DollarBot V5 — Smart • Fast • Limitless»\n` +
-    `Type .help <command> for detailed usage`
-  );
-}
+    `«💵 DollarBot V5 — Smart • Fast • Limitless»`;
 
-async function sendMenu(sock, jid) {
-  const caption = getMenuText();
-  if (fs.existsSync(MENU_IMAGE_PATH)) {
-    const imageBuffer = fs.readFileSync(MENU_IMAGE_PATH);
-    await sock.sendMessage(jid, { image: imageBuffer, caption, jpegThumbnail: imageBuffer });
-  } else {
-    await sock.sendMessage(jid, { text: caption });
-  }
-}
-
-function extractSender(msg, isGroup) {
-  if (isGroup) return msg.key.participant || msg.key.remoteJid;
-  return msg.key.remoteJid;
-}
-
-function extractBody(msg) {
-  return (
-    msg.message?.conversation ||
-    msg.message?.extendedTextMessage?.text ||
-    msg.message?.imageMessage?.caption ||
-    msg.message?.videoMessage?.caption ||
-    msg.message?.buttonsResponseMessage?.selectedButtonId ||
-    msg.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
-    ''
-  );
-}
-
-async function getBotAdminStatus(sock, jid) {
   try {
-    const meta = await sock.groupMetadata(jid);
-    const botId = (sock.user?.id || '').replace(/:.*@/, '@');
-    return meta.participants.some(p => {
-      const pid = p.id.replace(/:.*@/, '@');
-      return pid === botId && p.admin;
-    });
-  } catch {
-    return false;
-  }
+    if (fs.existsSync(MENU_IMG)) {
+      const img = fs.readFileSync(MENU_IMG);
+      await sock.sendMessage(jid, { image: img, caption });
+      return;
+    }
+  } catch (_) {}
+  await sock.sendMessage(jid, { text: caption });
 }
+
+function ownerOnly(sock, jid) {
+  return sock.sendMessage(jid, { text: '🔐 This command is restricted to the bot owner.' });
+}
+
+// ── Main message handler ────────────────────────────────────────────────────
 
 async function handleMessage(sock, msg) {
   try {
@@ -122,42 +134,31 @@ async function handleMessage(sock, msg) {
     if (!jid || jid === 'status@broadcast') return;
 
     const isGroup = jid.endsWith('@g.us');
-    const sender = extractSender(msg, isGroup);
-    const isOwner =
-      sender === config.ownerJid ||
-      sender?.split('@')[0] === config.ownerNumber ||
-      sender?.split(':')[0] === config.ownerNumber;
-
-    const body = extractBody(msg);
+    const sender  = extractSender(msg, isGroup);
+    const isOwner = isOwnerJid(sender);
+    const body    = extractBody(msg);
     if (!body) return;
 
-    const prefix = config.prefix;
-    const isCommand = body.startsWith(prefix);
+    const isCmd = body.startsWith(config.prefix);
 
-    if (!isCommand) {
+    if (!isCmd) {
       await handleNonCommand(sock, msg, body, jid, sender, isGroup, isOwner);
       return;
     }
 
-    const fullCmd = body.slice(prefix.length).trim();
-    const [rawCmd, ...args] = fullCmd.split(/\s+/);
+    const [rawCmd, ...args] = body.slice(config.prefix.length).trim().split(/\s+/);
     const cmd = rawCmd.toLowerCase();
 
-    let isAdmin = false;
-    if (isGroup) {
-      isAdmin = await getBotAdminStatus(sock, jid);
-    }
+    const isAdmin = isGroup ? await isBotAdmin(sock, jid) : false;
 
     try { await sock.readMessages([msg.key]); } catch (_) {}
 
     switch (cmd) {
-      case 'menu':
-      case 'help':
-      case 'start':
-        await sendMenu(sock, jid);
-        break;
+      // Menu
+      case 'menu': case 'help': case 'start':
+        await sendMenu(sock, jid); break;
 
-      // ── User ──────────────────────────────────────────
+      // ── User ──────────────────────────────────────────────────────────────
       case 'ping':    await userCommands.ping(sock, msg); break;
       case 'alive':   await userCommands.alive(sock, msg); break;
       case 'owner':   await userCommands.owner(sock, msg); break;
@@ -169,49 +170,33 @@ async function handleMessage(sock, msg) {
       case 'runtime': await userCommands.runtime(sock, msg); break;
       case 'uptime':  await userCommands.uptime(sock, msg); break;
 
-      // ── Owner ─────────────────────────────────────────
-      case 'say':
-        if (!isOwner) return replyOwnerOnly(sock, jid);
-        await ownerCommands.say(sock, msg, args); break;
-      case 'sendto':
-        if (!isOwner) return replyOwnerOnly(sock, jid);
-        await ownerCommands.sendto(sock, msg, args); break;
-      case 'react':
-        if (!isOwner) return replyOwnerOnly(sock, jid);
-        await ownerCommands.react(sock, msg, args); break;
-      case 'delete':
-        if (!isOwner) return replyOwnerOnly(sock, jid);
-        await ownerCommands.delete(sock, msg); break;
-      case 'autoreply':
-        if (!isOwner) return replyOwnerOnly(sock, jid);
-        await ownerCommands.autoreply(sock, msg, args); break;
-      case 'vv':
-        if (!isOwner) return replyOwnerOnly(sock, jid);
-        await ownerCommands.vv(sock, msg); break;
-      case 'broadcast':
-        if (!isOwner) return replyOwnerOnly(sock, jid);
-        await ownerCommands.broadcast(sock, msg, args); break;
-      case 'shutdown':
-        if (!isOwner) return replyOwnerOnly(sock, jid);
-        await ownerCommands.shutdown(sock, msg); break;
+      // ── Owner ─────────────────────────────────────────────────────────────
+      case 'say':        if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.say(sock, msg, args); break;
+      case 'sendto':     if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.sendto(sock, msg, args); break;
+      case 'react':      if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.react(sock, msg, args); break;
+      case 'delete':     if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.delete(sock, msg); break;
+      case 'autoreply':  if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.autoreply(sock, msg, args); break;
+      case 'vv':         if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.vv(sock, msg); break;
+      case 'broadcast':  if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.broadcast(sock, msg, args); break;
+      case 'shutdown':   if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.shutdown(sock, msg); break;
 
-      // ── AI ────────────────────────────────────────────
-      case 'cortex':      await aiCommands.cortex(sock, msg, args, jid); break;
-      case 'mera':        await aiCommands.mera(sock, msg, args, jid); break;
-      case 'codeai':      await aiCommands.codeai(sock, msg, args, jid); break;
-      case 'roast':       await aiCommands.roast(sock, msg, args, jid); break;
-      case 'complimentai':await aiCommands.complimentai(sock, msg, args, jid); break;
-      case 'weather':     await aiCommands.weather(sock, msg, args, jid); break;
-      case 'imagine':     await aiCommands.imagine(sock, msg, args, jid); break;
-      case 'translate':   await aiCommands.translate(sock, msg, args, jid); break;
-      case 'clear':       await aiCommands.clear(sock, msg, args, jid); break;
+      // ── AI ────────────────────────────────────────────────────────────────
+      case 'cortex':       await aiCommands.cortex(sock, msg, args, jid); break;
+      case 'mera':         await aiCommands.mera(sock, msg, args, jid); break;
+      case 'codeai':       await aiCommands.codeai(sock, msg, args, jid); break;
+      case 'roast':        await aiCommands.roast(sock, msg, args, jid); break;
+      case 'complimentai': await aiCommands.complimentai(sock, msg, args, jid); break;
+      case 'weather':      await aiCommands.weather(sock, msg, args, jid); break;
+      case 'imagine':      await aiCommands.imagine(sock, msg, args, jid); break;
+      case 'translate':    await aiCommands.translate(sock, msg, args, jid); break;
+      case 'clear':        await aiCommands.clear(sock, msg, args, jid); break;
 
-      // ── Search ────────────────────────────────────────
+      // ── Search ────────────────────────────────────────────────────────────
       case 'search': await searchCommands.search(sock, msg, args); break;
       case 'wiki':   await searchCommands.wiki(sock, msg, args); break;
       case 'define': await searchCommands.define(sock, msg, args); break;
 
-      // ── Fun ───────────────────────────────────────────
+      // ── Fun ───────────────────────────────────────────────────────────────
       case 'joke':       await funCommands.joke(sock, msg); break;
       case 'dadjoke':    await funCommands.dadjoke(sock, msg); break;
       case 'fact':       await funCommands.fact(sock, msg); break;
@@ -227,7 +212,7 @@ async function handleMessage(sock, msg) {
       case 'coolcheck':  await funCommands.coolcheck(sock, msg, args); break;
       case 'lovecheck':  await funCommands.lovecheck(sock, msg, args); break;
 
-      // ── Utility ───────────────────────────────────────
+      // ── Utility ───────────────────────────────────────────────────────────
       case 'calculate': await utilityCommands.calculate(sock, msg, args); break;
       case 'genpass':   await utilityCommands.genpass(sock, msg, args); break;
       case 'encode':    await utilityCommands.encode(sock, msg, args); break;
@@ -235,8 +220,9 @@ async function handleMessage(sock, msg) {
       case 'qr':        await utilityCommands.qr(sock, msg, args); break;
       case 'tinyurl':   await utilityCommands.tinyurl(sock, msg, args); break;
       case 'pingweb':   await utilityCommands.pingweb(sock, msg, args); break;
+      case 'tts':       await utilityCommands.tts(sock, msg, args); break;
 
-      // ── Games ─────────────────────────────────────────
+      // ── Games ─────────────────────────────────────────────────────────────
       case 'coin':      await gameCommands.coin(sock, msg); break;
       case 'dice':      await gameCommands.dice(sock, msg, args); break;
       case 'rps':       await gameCommands.rps(sock, msg, args); break;
@@ -245,7 +231,7 @@ async function handleMessage(sock, msg) {
       case 'slot':      await gameCommands.slot(sock, msg); break;
       case 'tictactoe': await gameCommands.tictactoe(sock, msg, args); break;
 
-      // ── Group ─────────────────────────────────────────
+      // ── Group ─────────────────────────────────────────────────────────────
       case 'kick':      await groupCommands.kick(sock, msg, args, isAdmin); break;
       case 'promote':   await groupCommands.promote(sock, msg, args, isAdmin); break;
       case 'demote':    await groupCommands.demote(sock, msg, args, isAdmin); break;
@@ -261,7 +247,7 @@ async function handleMessage(sock, msg) {
 
       default:
         await sock.sendMessage(jid, {
-          text: `❌ Unknown command: *.${cmd}*\n\nType *.menu* to see all available commands.`,
+          text: `❓ Unknown command: *.${cmd}*\n\nType *.menu* to see all commands.`,
         });
     }
   } catch (err) {
@@ -269,36 +255,34 @@ async function handleMessage(sock, msg) {
   }
 }
 
-function replyOwnerOnly(sock, jid) {
-  return sock.sendMessage(jid, { text: '🔐 This command is restricted to the bot owner.' });
-}
-
 async function handleNonCommand(sock, msg, body, jid, sender, isGroup, isOwner) {
   try {
-    const mathHandled = await gameCommands.checkMathAnswer(sock, msg, body);
-    if (mathHandled) return;
+    // Active math game answer check
+    const mathDone = await gameCommands.checkMathAnswer(sock, msg, body);
+    if (mathDone) return;
 
-    if (isGroup) {
+    // Anti-link enforcement
+    if (isGroup && !isOwner) {
       const antilinkGroups = store.get('antilinkGroups') || {};
-      if (antilinkGroups[jid] && LINK_REGEX.test(body) && !isOwner) {
+      if (antilinkGroups[jid] && LINK_RE.test(body)) {
         try { await sock.sendMessage(jid, { delete: msg.key }); } catch (_) {}
         await sock.sendMessage(jid, {
-          text: `🚫 @${sender?.split('@')[0]}, links are not allowed in this group!`,
+          text: `🚫 @${sender?.split('@')[0]}, links are not allowed here!`,
           mentions: [sender],
         });
         return;
       }
     }
 
-    const autoReply = store.get('autoreply');
-    if (autoReply && !isGroup) {
-      const responses = [
-        `👋 Hey! I'm *DollarBot V5* 🤖\nType *.menu* to see all my commands!`,
-        `💵 DollarBot V5 here. Type *.menu* for a full list of features!`,
+    // Auto-reply in DMs
+    if (store.get('autoreply') && !isGroup) {
+      const replies = [
+        `👋 Hey! I'm *DollarBot V5* 🤖\nType *.menu* to see all my features!`,
+        `💵 DollarBot V5 is active. Type *.menu* for commands!`,
         `⚡ Online and ready! Type *.menu* to get started.`,
       ];
       await sock.sendMessage(jid, {
-        text: responses[Math.floor(Math.random() * responses.length)],
+        text: replies[Math.floor(Math.random() * replies.length)],
       });
     }
   } catch (_) {}
@@ -318,7 +302,7 @@ async function handleGroupParticipants(sock, update) {
             `╭━━━〔 👋 WELCOME 〕━━━⬣\n` +
             `┃\n` +
             `┃ Welcome ${tag}! 🎉\n` +
-            `┃ Glad to have you here.\n` +
+            `┃ Happy you're here.\n` +
             `┃\n` +
             `┃ Type *.menu* for bot commands.\n` +
             `┃\n` +

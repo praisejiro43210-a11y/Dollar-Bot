@@ -1,115 +1,155 @@
 const config = require('../config');
 const store = require('../lib/store');
 
+// Helper: extract quoted message context
+function getQuoted(msg) {
+  return (
+    msg.message?.extendedTextMessage?.contextInfo ||
+    msg.message?.imageMessage?.contextInfo ||
+    msg.message?.videoMessage?.contextInfo ||
+    msg.message?.audioMessage?.contextInfo ||
+    null
+  );
+}
+
 const ownerCommands = {
   async say(sock, msg, args) {
     const jid = msg.key.remoteJid;
-    if (!args.length) {
-      return sock.sendMessage(jid, { text: '❌ Usage: .say <text>' });
-    }
+    if (!args.length) return sock.sendMessage(jid, { text: '❌ Usage: .say <text>' });
     await sock.sendMessage(jid, { text: args.join(' ') });
   },
 
   async sendto(sock, msg, args) {
     const jid = msg.key.remoteJid;
     if (args.length < 2) {
-      return sock.sendMessage(jid, { text: '❌ Usage: .sendto <number> <message>\nExample: .sendto 14378898269 Hello there!' });
+      return sock.sendMessage(jid, { text: '❌ Usage: .sendto <number> <message>\nE.g. .sendto 14378898269 Hello!' });
     }
     const number = args[0].replace(/\D/g, '');
-    const message = args.slice(1).join(' ');
-    const targetJid = `${number}@s.whatsapp.net`;
+    const text = args.slice(1).join(' ');
     try {
-      await sock.sendMessage(targetJid, { text: message });
-      await sock.sendMessage(jid, { text: `✅ Message sent to +${number}` });
+      await sock.sendMessage(`${number}@s.whatsapp.net`, { text });
+      await sock.sendMessage(jid, { text: `✅ Sent to +${number}` });
     } catch (e) {
-      await sock.sendMessage(jid, { text: `❌ Failed to send: ${e.message}` });
+      await sock.sendMessage(jid, { text: `❌ Failed: ${e.message}` });
     }
   },
 
   async react(sock, msg, args) {
     const jid = msg.key.remoteJid;
-    if (!args[0]) {
-      return sock.sendMessage(jid, { text: '❌ Usage: .react <emoji>' });
-    }
     const emoji = args[0];
-    const key = msg.message?.extendedTextMessage?.contextInfo?.stanzaId
-      ? {
-          remoteJid: jid,
-          id: msg.message.extendedTextMessage.contextInfo.stanzaId,
-          fromMe: false,
-          participant: msg.message.extendedTextMessage.contextInfo.participant,
-        }
+    if (!emoji) return sock.sendMessage(jid, { text: '❌ Usage: .react <emoji>\nReply to a message with this command.' });
+
+    const ctx = getQuoted(msg);
+    // React to the quoted message if replying, otherwise react to own command
+    const targetKey = ctx?.stanzaId
+      ? { remoteJid: jid, id: ctx.stanzaId, fromMe: false, participant: ctx.participant || undefined }
       : msg.key;
 
-    await sock.sendMessage(jid, {
-      react: { text: emoji, key },
-    });
+    try {
+      await sock.sendMessage(jid, { react: { text: emoji, key: targetKey } });
+    } catch (e) {
+      await sock.sendMessage(jid, { text: `❌ React failed: ${e.message}` });
+    }
   },
 
   async delete(sock, msg) {
     const jid = msg.key.remoteJid;
-    const quoted = msg.message?.extendedTextMessage?.contextInfo;
-    if (!quoted) {
-      return sock.sendMessage(jid, { text: '❌ Reply to a message to delete it.' });
+    const ctx = getQuoted(msg);
+    if (!ctx?.stanzaId) {
+      return sock.sendMessage(jid, { text: '❌ Reply to the message you want to delete.' });
     }
-    const deleteKey = {
-      remoteJid: jid,
-      id: quoted.stanzaId,
-      fromMe: false,
-      participant: quoted.participant,
-    };
-    await sock.sendMessage(jid, { delete: deleteKey });
+    const isGroup = jid.endsWith('@g.us');
+    try {
+      await sock.sendMessage(jid, {
+        delete: {
+          remoteJid: jid,
+          id: ctx.stanzaId,
+          fromMe: false,
+          participant: isGroup ? (ctx.participant || undefined) : undefined,
+        },
+      });
+    } catch (e) {
+      await sock.sendMessage(jid, { text: `❌ Delete failed: ${e.message}` });
+    }
   },
 
   async autoreply(sock, msg, args) {
     const jid = msg.key.remoteJid;
-    const setting = args[0]?.toLowerCase();
-    if (!['on', 'off'].includes(setting)) {
+    const val = args[0]?.toLowerCase();
+    if (!['on', 'off'].includes(val)) {
       return sock.sendMessage(jid, { text: '❌ Usage: .autoreply on/off' });
     }
-    store.set('autoreply', setting === 'on');
+    store.set('autoreply', val === 'on');
     await sock.sendMessage(jid, {
-      text: `✅ AutoReply is now *${setting.toUpperCase()}* ${setting === 'on' ? '✅' : '❌'}`,
+      text: `✅ AutoReply is now *${val.toUpperCase()}* ${val === 'on' ? '✅' : '❌'}`,
     });
   },
 
   async vv(sock, msg) {
     const jid = msg.key.remoteJid;
-    const quoted = msg.message?.extendedTextMessage?.contextInfo;
-    if (!quoted || !quoted.quotedMessage) {
-      return sock.sendMessage(jid, { text: '❌ Reply to a view-once message.' });
+    const ctx = getQuoted(msg);
+
+    if (!ctx?.quotedMessage) {
+      return sock.sendMessage(jid, { text: '❌ Reply to a view-once photo or video with .vv' });
     }
-    const qMsg = quoted.quotedMessage;
-    const viewOnceKey = Object.keys(qMsg).find(k => k.includes('ViewOnce'));
-    if (!viewOnceKey) {
-      return sock.sendMessage(jid, { text: '❌ That message is not a view-once media.' });
+
+    const qMsg = ctx.quotedMessage;
+
+    // Baileys stores view-once in these keys (camelCase, lowercase 'v')
+    const viewOnceInner =
+      qMsg?.viewOnceMessage?.message ||
+      qMsg?.viewOnceMessageV2?.message ||
+      qMsg?.viewOnceMessageV2Extension?.message;
+
+    if (!viewOnceInner) {
+      return sock.sendMessage(jid, { text: '❌ That message is not a view-once photo/video.' });
     }
-    await sock.sendMessage(jid, qMsg[viewOnceKey].message || qMsg[viewOnceKey]);
+
+    // Determine media type (imageMessage or videoMessage)
+    const mediaType = Object.keys(viewOnceInner).find(k =>
+      ['imageMessage', 'videoMessage', 'audioMessage'].includes(k)
+    );
+
+    if (!mediaType) {
+      return sock.sendMessage(jid, { text: '❌ Could not extract view-once media.' });
+    }
+
+    try {
+      const mediaMsgContent = { ...viewOnceInner[mediaType], viewOnce: false };
+      await sock.sendMessage(jid, { [mediaType]: mediaMsgContent });
+      await sock.sendMessage(jid, { text: '✅ View-once media revealed!' });
+    } catch (e) {
+      await sock.sendMessage(jid, { text: `❌ VV Error: ${e.message}` });
+    }
   },
 
   async broadcast(sock, msg, args) {
     const jid = msg.key.remoteJid;
-    if (!args.length) {
-      return sock.sendMessage(jid, { text: '❌ Usage: .broadcast <message>' });
+    if (!args.length) return sock.sendMessage(jid, { text: '❌ Usage: .broadcast <message>' });
+    const text = args.join(' ');
+    let groups;
+    try {
+      groups = await sock.groupFetchAllParticipating();
+    } catch (e) {
+      return sock.sendMessage(jid, { text: `❌ Failed to fetch groups: ${e.message}` });
     }
-    const message = args.join(' ');
-    const groups = await sock.groupFetchAllParticipating();
-    const groupList = Object.keys(groups);
+    const ids = Object.keys(groups);
     let sent = 0;
-    for (const gid of groupList) {
+    await sock.sendMessage(jid, { text: `📡 Broadcasting to ${ids.length} groups...` });
+    for (const gid of ids) {
       try {
-        await sock.sendMessage(gid, { text: `📢 *BROADCAST*\n\n${message}\n\n— ${config.botName}` });
+        await sock.sendMessage(gid, { text: `📢 *BROADCAST*\n\n${text}\n\n— ${config.botName} V${config.version}` });
         sent++;
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise(r => setTimeout(r, 600));
       } catch (_) {}
     }
-    await sock.sendMessage(jid, { text: `✅ Broadcast sent to ${sent}/${groupList.length} groups.` });
+    await sock.sendMessage(jid, { text: `✅ Broadcast complete: ${sent}/${ids.length} groups reached.` });
   },
 
   async shutdown(sock, msg) {
     const jid = msg.key.remoteJid;
-    await sock.sendMessage(jid, { text: '🔴 *DollarBot V5 shutting down...*\n\nGoodbye! 💵' });
-    await new Promise(r => setTimeout(r, 1500));
+    await sock.sendMessage(jid, { text: '🔴 *DollarBot V5 shutting down...*\nGoodbye! 💵' });
+    await new Promise(r => setTimeout(r, 2000));
     process.exit(0);
   },
 };
