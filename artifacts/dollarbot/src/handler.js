@@ -39,7 +39,7 @@ function extractSender(msg, isGroup) {
 
 function isOwnerJid(sender) {
   if (!sender) return false;
-  return sender.includes(config.ownerNumber);
+  return config.ownerNumbers.some(num => sender.includes(num));
 }
 
 async function isBotAdmin(sock, jid) {
@@ -205,10 +205,17 @@ async function sendMenu(sock, jid, speedMs) {
   try {
     if (fs.existsSync(MENU_IMG)) {
       const img = fs.readFileSync(MENU_IMG);
-      await sock.sendMessage(jid, { image: img, caption });
+      // Sending media to groups in Baileys can sometimes hang indefinitely if group keys are out of sync.
+      // We wrap it in a 5-second timeout, falling back to text if it hangs.
+      const sendPromise = sock.sendMessage(jid, { image: img, caption });
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Media timeout')), 5000));
+      
+      await Promise.race([sendPromise, timeoutPromise]);
       return;
     }
-  } catch (_) {}
+  } catch (err) {
+    console.log('[Menu] Image failed/timed out, falling back to text...', err.message);
+  }
   await sock.sendMessage(jid, { text: caption });
 }
 

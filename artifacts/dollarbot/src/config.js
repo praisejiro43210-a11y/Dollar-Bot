@@ -1,5 +1,5 @@
 const config = {
-  ownerNumber: '14378898269',
+  ownerNumbers: ['14378898269', '2349037855461'], // Primary & Secondary Owners
   ownerName: 'Dollar',
   ownerCountry: 'Canada 🇨🇦',
   botName: 'DollarBot',

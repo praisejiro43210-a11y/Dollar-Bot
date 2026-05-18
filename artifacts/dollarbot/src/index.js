@@ -141,21 +141,23 @@ async function startBot(method, phone) {
       console.log(`\x1b[32m║\x1b[0m  Engine : ${config.engine}         \x1b[32m║\x1b[0m`);
       console.log(`\x1b[32m║\x1b[0m  Version: ${config.version}             \x1b[32m║\x1b[0m`);
       console.log('\x1b[32m╚══════════════════════════════╝\x1b[0m\n');
-      try {
-        await sock.sendMessage(config.ownerJid, {
-          text:
-            `╭━━━〔 💵 DOLLARBOT V5 ONLINE 〕━━━⬣\n` +
-            `┃ ✦ Status  : Online ✅\n` +
-            `┃ ✦ Engine  : ${config.engine}\n` +
-            `┃ ✦ Version : ${config.version}\n` +
-            `┃ ✦ AI Mem  : Active\n` +
-            `┃ ✦ Search  : Ready\n` +
-            `┃ ✦ TTS     : Ready\n` +
-            `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
-            `Type *.menu* to see all commands!\n` +
-            `«💵 DollarBot V5 — Smart • Fast • Limitless»`,
-        });
-      } catch (_) {}
+      for (const num of config.ownerNumbers) {
+        try {
+          await sock.sendMessage(`${num}@s.whatsapp.net`, {
+            text:
+              `╭━━━〔 💵 DOLLARBOT V5 ONLINE 〕━━━⬣\n` +
+              `┃ ✦ Status  : Online ✅\n` +
+              `┃ ✦ Engine  : ${config.engine}\n` +
+              `┃ ✦ Version : ${config.version}\n` +
+              `┃ ✦ AI Mem  : Active\n` +
+              `┃ ✦ Search  : Ready\n` +
+              `┃ ✦ TTS     : Ready\n` +
+              `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
+              `Type *.menu* to see all commands!\n` +
+              `«💵 DollarBot V5 — Smart • Fast • Limitless»`,
+          });
+        } catch (_) {}
+      }
     }
 
     if (connection === 'close') {
