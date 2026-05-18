@@ -32,6 +32,7 @@ function extractBody(msg) {
 }
 
 function extractSender(msg, isGroup) {
+  if (msg.key.fromMe) return config.ownerNumbers[0] + '@s.whatsapp.net';
   return isGroup
     ? (msg.key.participant || msg.key.remoteJid)
     : msg.key.remoteJid;
@@ -392,12 +393,16 @@ async function handleNonCommand(sock, msg, body, jid, sender, isGroup, isOwner) 
       }
     }
 
-    // Auto-reply DMs (Human-like AI)
-    if (store.get('autoreply') && !isGroup && body) {
+    // Auto-reply DMs and Group mentions (Human-like AI)
+    const botBareJid = (sock.user?.id || '').split(':')[0];
+    const isMentioned = body.includes('@' + botBareJid);
+    if (store.get('autoreply') && (!isGroup || isMentioned) && body) {
       try {
         await sock.sendPresenceUpdate('composing', jid);
         const { autoReplyAI } = require('./lib/pollinations');
-        const aiResponse = await autoReplyAI(jid, body);
+        // Remove bot mention from body to prevent confusing the AI
+        const cleanBody = body.replace(new RegExp(`@${botBareJid}`, 'g'), '').trim();
+        const aiResponse = await autoReplyAI(jid, cleanBody || 'Hello');
         await sock.sendMessage(jid, { text: aiResponse });
       } catch (err) {
         console.log('[AutoReply Error]', err.message);

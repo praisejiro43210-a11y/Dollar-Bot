@@ -134,50 +134,38 @@ async function autoReplyAI(jid, text) {
   return responseText;
 }
 
-// TTS: Primary Canopy (via Groq), Fallback Pollinations
+// TTS: StreamElements (Primary) and Google TTS (Fallback)
 async function tts(text) {
-  let groqError;
-  // Try Canopy (via Groq) First
-  if (config.groqApiKey && !config.groqApiKey.includes('YOUR_GROQ')) {
-    try {
-      const res = await fetch('https://api.groq.com/openai/v1/audio/speech', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.groqApiKey}`
-        },
-        body: JSON.stringify({ 
-          model: 'canopy', 
-          input: text.slice(0, 4000), 
-          voice: 'austin' 
-        }),
-        timeout: 30000,
-      });
-
-      if (res.ok) {
-        const buffer = await res.buffer();
-        return { buffer, mime: 'audio/mpeg' };
-      } else {
-        groqError = `Groq HTTP ${res.status}`;
-      }
-    } catch (e) {
-      groqError = e.message;
+  try {
+    const encodedText = encodeURIComponent(text.slice(0, 500));
+    const res = await fetch(`https://api.streamelements.com/kappa/v2/speech?voice=Brian&text=${encodedText}`, {
+      timeout: 30000,
+    });
+    
+    if (res.ok) {
+      const buffer = await res.buffer();
+      return { buffer, mime: 'audio/mpeg' };
     }
+  } catch (err) {
+    console.log('[TTS] StreamElements failed:', err.message);
   }
 
-  // Fallback to StreamElements TTS (100% Reliable)
-  console.log(`[TTS] Canopy (Groq) failed or not configured (${groqError}). Falling back to StreamElements...`);
-  const encodedText = encodeURIComponent(text.slice(0, 400));
-  const res2 = await fetch(`https://api.streamelements.com/kappa/v2/speech?voice=Brian&text=${encodedText}`, {
-    timeout: 30000,
-  });
-  
-  if (res2.ok) {
-    const buffer = await res2.buffer();
-    return { buffer, mime: 'audio/mpeg' };
+  // Fallback to Google TTS (shorter text limit)
+  try {
+    const encodedText2 = encodeURIComponent(text.slice(0, 200));
+    const res2 = await fetch(`https://translate.google.com/translate_tts?ie=UTF-8&q=${encodedText2}&tl=en&client=tw-ob`, {
+      timeout: 10000,
+    });
+    
+    if (res2.ok) {
+      const buffer = await res2.buffer();
+      return { buffer, mime: 'audio/mpeg' };
+    }
+  } catch (err) {
+    console.log('[TTS] Google TTS failed:', err.message);
   }
   
-  throw new Error(`Both Canopy (Groq) and StreamElements TTS Failed.`);
+  throw new Error(`Both StreamElements and Google TTS Failed.`);
 }
 
 module.exports = { cortex, mera, codeAI, roast, complimentAI, getWeather, translate, getImageUrl, tts, textGenerate, autoReplyAI };
