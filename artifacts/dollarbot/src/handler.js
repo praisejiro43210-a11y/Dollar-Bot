@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const config = require('./config');
 const store = require('./lib/store');
@@ -55,61 +56,151 @@ async function isBotAdmin(sock, jid) {
   }
 }
 
-async function sendMenu(sock, jid) {
+function getUptime() {
+  const ms = Date.now() - config.startTime;
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return `${h}h ${m}m ${sec}s`;
+}
+
+function getRamInfo() {
+  const total = os.totalmem();
+  const free = os.freemem();
+  const used = total - free;
+  const pct = Math.round((used / total) * 100);
+  const bars = Math.floor(pct / 20);
+  const bar = '▰'.repeat(bars) + '▱'.repeat(5 - bars);
+  const usedGB = (used / 1e9).toFixed(1);
+  const totalGB = (total / 1e9).toFixed(1);
+  return { pct, bar, usedGB, totalGB };
+}
+
+async function sendMenu(sock, jid, speedMs) {
+  const ram = getRamInfo();
+  const uptime = getUptime();
+  const autoReply = store.get('autoreply') ? 'ON ✅' : 'OFF ❌';
+  const speed = speedMs !== undefined ? `${speedMs} ms` : '—';
+
   const caption =
     `╭━━━〔 💵 𝐃𝐎𝐋𝐋𝐀𝐑𝐁𝐎𝐓 𝐕5 〕━━━⬣\n` +
     `┃ ✦ Owner   : ${config.ownerName}\n` +
     `┃ ✦ Country : ${config.ownerCountry}\n` +
     `┃ ✦ Prefix  : [ ${config.prefix} ]\n` +
+    `┃ ✦ User    : Premium Member\n` +
     `┃ ✦ Mode    : Public\n` +
+    `┃ ✦ Platform: WhatsApp\n` +
     `┃ ✦ Engine  : ${config.engine}\n` +
+    `┃ ✦ Speed   : ${speed}\n` +
+    `┃ ✦ Uptime  : ${uptime}\n` +
     `┃ ✦ Version : ${config.version}\n` +
+    `┃ ✦ RAM     : ${ram.bar} ${ram.pct}%\n` +
+    `┃ ✦ Usage   : ${ram.usedGB}GB / ${ram.totalGB}GB\n` +
+    `┃ ✦ AutoReply: ${autoReply}\n` +
     `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
     `«⚡ Developed By Dollar\n⚡ Powered By Cortex & Mera AI»\n\n` +
-    `╭━━━〔 👤 USER 〕━━━⬣\n` +
-    `┃ .ping .alive .owner .stats\n` +
-    `┃ .info .details .time .jid\n` +
-    `┃ .runtime .uptime\n` +
+
+    `╭━━━〔 👤 USER COMMANDS 〕━━━⬣\n` +
+    `┃ ◇ .ping\n` +
+    `┃ ◇ .alive\n` +
+    `┃ ◇ .owner\n` +
+    `┃ ◇ .stats\n` +
+    `┃ ◇ .info\n` +
+    `┃ ◇ .time\n` +
+    `┃ ◇ .jid\n` +
+    `┃ ◇ .runtime\n` +
+    `┃ ◇ .uptime\n` +
     `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
-    `╭━━━〔 🔐 OWNER 〕━━━⬣\n` +
-    `┃ .say .sendto .react .delete\n` +
-    `┃ .autoreply .vv .broadcast .shutdown\n` +
+
+    `╭━━━〔 🔐 OWNER COMMANDS 〕━━━⬣\n` +
+    `┃ ◇ .say <text>\n` +
+    `┃ ◇ .sendto <number> <msg>\n` +
+    `┃ ◇ .react <emoji>\n` +
+    `┃ ◇ .delete\n` +
+    `┃ ◇ .autoreply on/off\n` +
+    `┃ ◇ .vv\n` +
+    `┃ ◇ .broadcast <msg>\n` +
+    `┃ ◇ .shutdown\n` +
     `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
-    `╭━━━〔 🧠 AI (with memory) 〕━━━⬣\n` +
-    `┃ .cortex .mera .codeai .roast\n` +
-    `┃ .complimentai .weather .imagine\n` +
-    `┃ .translate .clear\n` +
+
+    `╭━━━〔 🧠 AI COMMANDS 〕━━━⬣\n` +
+    `┃ ◇ .cortex <question>\n` +
+    `┃ ◇ .mera <question>\n` +
+    `┃ ◇ .codeai <question>\n` +
+    `┃ ◇ .roast <name>\n` +
+    `┃ ◇ .complimentai <name>\n` +
+    `┃ ◇ .weather <city>\n` +
+    `┃ ◇ .imagine <prompt>\n` +
+    `┃ ◇ .translate <text>\n` +
+    `┃ ◇ .clear cortex/mera\n` +
     `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
-    `╭━━━〔 🔍 SEARCH 〕━━━⬣\n` +
-    `┃ .search .wiki .define\n` +
+
+    `╭━━━〔 🔍 SEARCH COMMANDS 〕━━━⬣\n` +
+    `┃ ◇ .search <query>\n` +
+    `┃ ◇ .wiki <topic>\n` +
+    `┃ ◇ .define <word>\n` +
     `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
-    `╭━━━〔 🎭 FUN 〕━━━⬣\n` +
-    `┃ .joke .dadjoke .fact .advice\n` +
-    `┃ .compliment .8ball .truth .dare\n` +
-    `┃ .reverse .hotcheck .smartcheck\n` +
-    `┃ .brainlevel .coolcheck .lovecheck\n` +
+
+    `╭━━━〔 🎭 FUN COMMANDS 〕━━━⬣\n` +
+    `┃ ◇ .joke\n` +
+    `┃ ◇ .dadjoke\n` +
+    `┃ ◇ .fact\n` +
+    `┃ ◇ .advice\n` +
+    `┃ ◇ .compliment\n` +
+    `┃ ◇ .8ball <question>\n` +
+    `┃ ◇ .truth\n` +
+    `┃ ◇ .dare\n` +
+    `┃ ◇ .reverse <text>\n` +
+    `┃ ◇ .hotcheck <name>\n` +
+    `┃ ◇ .smartcheck <name>\n` +
+    `┃ ◇ .brainlevel <name>\n` +
+    `┃ ◇ .coolcheck <name>\n` +
+    `┃ ◇ .lovecheck <name>\n` +
     `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
-    `╭━━━〔 🛠️ UTILITY 〕━━━⬣\n` +
-    `┃ .calculate .genpass .encode\n` +
-    `┃ .decode .qr .tinyurl .pingweb\n` +
-    `┃ .tts <text>\n` +
+
+    `╭━━━〔 🛠️ UTILITY COMMANDS 〕━━━⬣\n` +
+    `┃ ◇ .calculate <expr>\n` +
+    `┃ ◇ .genpass <length>\n` +
+    `┃ ◇ .encode <text>\n` +
+    `┃ ◇ .decode <base64>\n` +
+    `┃ ◇ .qr <text/url>\n` +
+    `┃ ◇ .tinyurl <url>\n` +
+    `┃ ◇ .pingweb <url>\n` +
+    `┃ ◇ .tts <text>\n` +
     `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
-    `╭━━━〔 🎮 GAMES 〕━━━⬣\n` +
-    `┃ .coin .dice .rps .math\n` +
-    `┃ .guess .slot .tictactoe\n` +
+
+    `╭━━━〔 🎮 GAME COMMANDS 〕━━━⬣\n` +
+    `┃ ◇ .coin\n` +
+    `┃ ◇ .dice <sides>\n` +
+    `┃ ◇ .rps <rock/paper/scissors>\n` +
+    `┃ ◇ .math\n` +
+    `┃ ◇ .guess <number>\n` +
+    `┃ ◇ .slot\n` +
+    `┃ ◇ .tictactoe <1-9>\n` +
     `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
-    `╭━━━〔 👥 GROUP (admin) 〕━━━⬣\n` +
-    `┃ .kick .promote .demote .mute\n` +
-    `┃ .unmute .tagall .everyone\n` +
-    `┃ .hidetag .grouplink .groupinfo\n` +
-    `┃ .antilink .welcome\n` +
+
+    `╭━━━〔 👥 GROUP COMMANDS 〕━━━⬣\n` +
+    `┃ ◇ .kick @user\n` +
+    `┃ ◇ .promote @user\n` +
+    `┃ ◇ .demote @user\n` +
+    `┃ ◇ .mute\n` +
+    `┃ ◇ .unmute\n` +
+    `┃ ◇ .tagall\n` +
+    `┃ ◇ .everyone <msg>\n` +
+    `┃ ◇ .hidetag <msg>\n` +
+    `┃ ◇ .grouplink\n` +
+    `┃ ◇ .groupinfo\n` +
+    `┃ ◇ .antilink on/off\n` +
+    `┃ ◇ .welcome on/off\n` +
     `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
+
     `╭━━━〔 🚀 STATUS 〕━━━⬣\n` +
-    `┃ Online & Stable ✅\n` +
-    `┃ AI Memory Active 🧠\n` +
-    `┃ Search Engine Ready 🔍\n` +
-    `┃ TTS Powered by Pollinations 🔊\n` +
+    `┃ DollarBot Online & Stable ✅\n` +
+    `┃ AI Systems Operational ⚡\n` +
+    `┃ Security Level : High 🔒\n` +
     `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
+
     `«💵 DollarBot V5 — Smart • Fast • Limitless»`;
 
   try {
@@ -148,15 +239,22 @@ async function handleMessage(sock, msg) {
 
     const [rawCmd, ...args] = body.slice(config.prefix.length).trim().split(/\s+/);
     const cmd = rawCmd.toLowerCase();
-
     const isAdmin = isGroup ? await isBotAdmin(sock, jid) : false;
 
     try { await sock.readMessages([msg.key]); } catch (_) {}
 
+    // Measure speed for menu
+    const cmdStart = Date.now();
+
     switch (cmd) {
-      // Menu
-      case 'menu': case 'help': case 'start':
-        await sendMenu(sock, jid); break;
+      case 'menu': case 'help': case 'start': {
+        const pingMsg = await sock.sendMessage(jid, { text: '⏳ Loading menu...' });
+        const speed = Date.now() - cmdStart;
+        await sendMenu(sock, jid, speed);
+        // delete the loading message
+        try { await sock.sendMessage(jid, { delete: pingMsg.key }); } catch (_) {}
+        break;
+      }
 
       // ── User ──────────────────────────────────────────────────────────────
       case 'ping':    await userCommands.ping(sock, msg); break;
@@ -171,14 +269,14 @@ async function handleMessage(sock, msg) {
       case 'uptime':  await userCommands.uptime(sock, msg); break;
 
       // ── Owner ─────────────────────────────────────────────────────────────
-      case 'say':        if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.say(sock, msg, args); break;
-      case 'sendto':     if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.sendto(sock, msg, args); break;
-      case 'react':      if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.react(sock, msg, args); break;
-      case 'delete':     if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.delete(sock, msg); break;
-      case 'autoreply':  if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.autoreply(sock, msg, args); break;
-      case 'vv':         if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.vv(sock, msg); break;
-      case 'broadcast':  if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.broadcast(sock, msg, args); break;
-      case 'shutdown':   if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.shutdown(sock, msg); break;
+      case 'say':       if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.say(sock, msg, args); break;
+      case 'sendto':    if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.sendto(sock, msg, args); break;
+      case 'react':     if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.react(sock, msg, args); break;
+      case 'delete':    if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.delete(sock, msg); break;
+      case 'autoreply': if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.autoreply(sock, msg, args); break;
+      case 'vv':        if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.vv(sock, msg); break;
+      case 'broadcast': if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.broadcast(sock, msg, args); break;
+      case 'shutdown':  if (!isOwner) return ownerOnly(sock, jid); await ownerCommands.shutdown(sock, msg); break;
 
       // ── AI ────────────────────────────────────────────────────────────────
       case 'cortex':       await aiCommands.cortex(sock, msg, args, jid); break;
@@ -247,7 +345,7 @@ async function handleMessage(sock, msg) {
 
       default:
         await sock.sendMessage(jid, {
-          text: `❓ Unknown command: *.${cmd}*\n\nType *.menu* to see all commands.`,
+          text: `❓ Unknown command: *.${cmd}*\n\nType *.menu* to see all available commands.`,
         });
     }
   } catch (err) {
@@ -257,11 +355,11 @@ async function handleMessage(sock, msg) {
 
 async function handleNonCommand(sock, msg, body, jid, sender, isGroup, isOwner) {
   try {
-    // Active math game answer check
-    const mathDone = await gameCommands.checkMathAnswer(sock, msg, body);
-    if (mathDone) return;
+    // Active math game answer
+    const done = await gameCommands.checkMathAnswer(sock, msg, body);
+    if (done) return;
 
-    // Anti-link enforcement
+    // Anti-link
     if (isGroup && !isOwner) {
       const antilinkGroups = store.get('antilinkGroups') || {};
       if (antilinkGroups[jid] && LINK_RE.test(body)) {
@@ -274,16 +372,14 @@ async function handleNonCommand(sock, msg, body, jid, sender, isGroup, isOwner) 
       }
     }
 
-    // Auto-reply in DMs
+    // Auto-reply DMs
     if (store.get('autoreply') && !isGroup) {
       const replies = [
         `👋 Hey! I'm *DollarBot V5* 🤖\nType *.menu* to see all my features!`,
         `💵 DollarBot V5 is active. Type *.menu* for commands!`,
         `⚡ Online and ready! Type *.menu* to get started.`,
       ];
-      await sock.sendMessage(jid, {
-        text: replies[Math.floor(Math.random() * replies.length)],
-      });
+      await sock.sendMessage(jid, { text: replies[Math.floor(Math.random() * replies.length)] });
     }
   } catch (_) {}
 }
@@ -302,16 +398,15 @@ async function handleGroupParticipants(sock, update) {
             `╭━━━〔 👋 WELCOME 〕━━━⬣\n` +
             `┃\n` +
             `┃ Welcome ${tag}! 🎉\n` +
-            `┃ Happy you're here.\n` +
+            `┃ Glad you joined us!\n` +
             `┃\n` +
             `┃ Type *.menu* for bot commands.\n` +
-            `┃\n` +
             `╰━━━━━━━━━━━━━━━━━━⬣`,
           mentions: [participant],
         });
       } else if (action === 'remove') {
         await sock.sendMessage(id, {
-          text: `👋 ${tag} has left. Goodbye!`,
+          text: `👋 ${tag} has left the group. Take care!`,
           mentions: [participant],
         });
       }
