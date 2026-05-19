@@ -27,9 +27,9 @@ const userCommands = {
   async ping(sock, msg) {
     const jid = msg.key.remoteJid;
     const start = Date.now();
-    const sent = await sock.sendMessage(jid, { text: '🏓 Pinging...' });
+    const sent = await sock.sendMessage(jid, { text: 'Pinging...' });
     const ping = Date.now() - start;
-    await sock.sendMessage(jid, { text: `🏓 *Pong!*\n⚡ Speed: *${ping}ms*` });
+    await sock.sendMessage(jid, { text: `*Pong!*\nSpeed: *${ping}ms*` });
     try { await sock.sendMessage(jid, { delete: sent.key }); } catch (_) {}
   },
 
@@ -37,10 +37,10 @@ const userCommands = {
     const jid = msg.key.remoteJid;
     const ram = getRamInfo();
     const uptime = getUptime();
-    const autoReply = store.get('autoreply') ? 'ON ✅' : 'OFF ❌';
+    const autoReply = store.get('autoreply') ? 'ON' : 'OFF';
 
     const start = Date.now();
-    const sent = await sock.sendMessage(jid, { text: '⏳' });
+    const sent = await sock.sendMessage(jid, { text: '...' });
     const speed = Date.now() - start;
     try { await sock.sendMessage(jid, { delete: sent.key }); } catch (_) {}
 
@@ -66,6 +66,8 @@ const userCommands = {
   },
 
   async owner(sock, msg) {
+    // Only shows the Canada (primary) number — never reveals secondary number
+    const primaryNumber = config.ownerNumbers[0];
     await sock.sendMessage(msg.key.remoteJid, {
       text:
         `╭━━━〔 👑 BOT OWNER 〕━━━⬣\n` +
@@ -81,10 +83,10 @@ const userCommands = {
     const jid = msg.key.remoteJid;
     const ram = getRamInfo();
     const uptime = getUptime();
-    const autoReply = store.get('autoreply') ? 'ON ✅' : 'OFF ❌';
+    const autoReply = store.get('autoreply') ? 'ON' : 'OFF';
 
     const start = Date.now();
-    const sent = await sock.sendMessage(jid, { text: '📊 Fetching stats...' });
+    const sent = await sock.sendMessage(jid, { text: 'Fetching stats...' });
     const speed = Date.now() - start;
     try { await sock.sendMessage(jid, { delete: sent.key }); } catch (_) {}
 

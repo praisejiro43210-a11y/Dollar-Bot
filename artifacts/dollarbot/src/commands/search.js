@@ -1,29 +1,35 @@
 const fetch = require('node-fetch');
+const { searchWithAI } = require('../lib/pollinations');
 
+// ── DuckDuckGo Instant Answer ─────────────────────────────────────────────
 async function duckSearch(query) {
   const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
   const res = await fetch(url, { timeout: 10000 });
-  if (!res.ok) throw new Error('Search failed');
+  if (!res.ok) throw new Error('DuckDuckGo search failed');
   const data = await res.json();
 
   const results = [];
-
-  if (data.AbstractText) results.push({ title: data.Heading || query, snippet: data.AbstractText, url: data.AbstractURL });
+  if (data.AbstractText) {
+    results.push({ title: data.Heading || query, snippet: data.AbstractText, url: data.AbstractURL });
+  }
   if (data.RelatedTopics) {
     for (const t of data.RelatedTopics.slice(0, 4)) {
-      if (t.Text && t.FirstURL) results.push({ title: t.Text.split(' - ')[0] || '', snippet: t.Text, url: t.FirstURL });
+      if (t.Text && t.FirstURL) {
+        results.push({ title: t.Text.split(' - ')[0] || '', snippet: t.Text, url: t.FirstURL });
+      }
     }
   }
   return results;
 }
 
+// ── Wikipedia Summary ─────────────────────────────────────────────────────
 async function wikiSearch(query) {
   const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&srlimit=1`;
   const searchRes = await fetch(searchUrl, { timeout: 10000 });
   if (!searchRes.ok) throw new Error('Wikipedia search failed');
   const searchData = await searchRes.json();
   const results = searchData?.query?.search;
-  if (!results || !results.length) throw new Error('No Wikipedia results found');
+  if (!results?.length) throw new Error('No Wikipedia results found');
 
   const title = results[0].title;
   const summaryUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
@@ -34,10 +40,10 @@ async function wikiSearch(query) {
     title: summary.title,
     extract: summary.extract || summary.description || 'No summary available.',
     url: summary.content_urls?.desktop?.page || `https://en.wikipedia.org/wiki/${encodeURIComponent(title)}`,
-    thumbnail: summary.thumbnail?.source || null,
   };
 }
 
+// ── Dictionary ────────────────────────────────────────────────────────────
 async function defineWord(word) {
   const url = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`;
   const res = await fetch(url, { timeout: 10000 });
@@ -58,34 +64,43 @@ const searchCommands = {
     if (!args.length) {
       return sock.sendMessage(jid, {
         text:
-          `╭━━━〔 WEB SEARCH 〕━━━⬣\n` +
-          `┃ Usage: .search <query>\n` +
-          `┃\n` +
-          `┃ Searches the web using DuckDuckGo.\n` +
-          `┃ Fast, private, no tracking.\n` +
-          `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
+          `*WEB SEARCH*\n\n` +
+          `Usage: .search <query>\n\n` +
+          `Searches the web and summarizes results using AI.\n` +
           `Example: .search best programming languages 2025`,
       });
     }
     const query = args.join(' ');
-    await sock.sendMessage(jid, { text: `*Searching for:* "${query}"...` });
+    await sock.sendMessage(jid, { text: `*Searching...*` });
     try {
-      const results = await duckSearch(query);
-      if (!results.length) {
-        return sock.sendMessage(jid, { text: `❌ No results found for "${query}". Try different keywords.` });
+      const ddgResults = await duckSearch(query);
+
+      // If DuckDuckGo has a meaningful abstract, use it
+      if (ddgResults.length && ddgResults[0].snippet && ddgResults[0].snippet.length > 50) {
+        let text = `*Search: ${query}*\n\n`;
+        ddgResults.slice(0, 3).forEach((r, i) => {
+          text += `*${i + 1}. ${r.title.slice(0, 60)}*\n`;
+          text += `${r.snippet.slice(0, 200)}${r.snippet.length > 200 ? '...' : ''}\n\n`;
+        });
+        text += `_Powered by DollarBot Search_`;
+        return await sock.sendMessage(jid, { text });
       }
-      let text = `╭━━━〔 🔍 SEARCH RESULTS 〕━━━⬣\n`;
-      text += `┃ Query: ${query}\n┃\n`;
-      results.slice(0, 4).forEach((r, i) => {
-        text += `┃ ${i + 1}. *${r.title.slice(0, 60)}*\n`;
-        text += `┃    ${r.snippet.slice(0, 100)}${r.snippet.length > 100 ? '...' : ''}\n`;
-        if (r.url) text += `┃    🔗 ${r.url}\n`;
-        text += `┃\n`;
-      });
-      text += `╰━━━━━━━━━━━━━━━━━━⬣\n\n⚡ Powered by DollarSearch`;
+
+      // Fallback: Ask AI directly for a clean, formatted answer
+      console.log('[Search] DuckDuckGo returned thin results — using AI fallback');
+      const aiAnswer = await searchWithAI(query);
+      const text = `*Search: ${query}*\n\n${aiAnswer}\n\n_Powered by DollarBot AI Search_`;
       await sock.sendMessage(jid, { text });
     } catch (e) {
-      await sock.sendMessage(jid, { text: `❌ Search Error: ${e.message}` });
+      // If DDG fails completely, still try AI
+      try {
+        const aiAnswer = await searchWithAI(query);
+        await sock.sendMessage(jid, {
+          text: `*Search: ${query}*\n\n${aiAnswer}\n\n_Powered by DollarBot AI Search_`,
+        });
+      } catch (e2) {
+        await sock.sendMessage(jid, { text: `Search failed: ${e2.message}` });
+      }
     }
   },
 
@@ -107,27 +122,28 @@ const searchCommands = {
     await sock.sendMessage(jid, { text: `📖 *Looking up Wikipedia:* "${query}"...` });
     try {
       const result = await wikiSearch(query);
-      const extract = result.extract.slice(0, 800) + (result.extract.length > 800 ? '...' : '');
+      const extract = result.extract.slice(0, 900) + (result.extract.length > 900 ? '...' : '');
       const text =
         `╭━━━〔 📖 WIKIPEDIA 〕━━━⬣\n` +
         `┃ *${result.title}*\n` +
         `┃\n` +
-        `${extract}\n\n` +
-        `📌 Read more: ${result.url}\n` +
+        `${extract.split('\n').map(l => '┃ ' + l).join('\n')}\n` +
+        `┃\n` +
+        `┃ 📌 Read more: ${result.url}\n` +
         `╰━━━━━━━━━━━━━━━━━━⬣\n\n⚡ Source: Wikipedia`;
       await sock.sendMessage(jid, { text });
     } catch (e) {
-      await sock.sendMessage(jid, { text: `❌ Wikipedia Error: ${e.message}` });
+      await sock.sendMessage(jid, { text: `Wikipedia Error: ${e.message}` });
     }
   },
 
   async define(sock, msg, args) {
     const jid = msg.key.remoteJid;
     if (!args.length) {
-      return sock.sendMessage(jid, { text: '❌ Usage: .define <word>\nExample: .define serendipity' });
+      return sock.sendMessage(jid, { text: 'Usage: .define <word>\nExample: .define serendipity' });
     }
     const word = args[0];
-    await sock.sendMessage(jid, { text: `📚 *Looking up:* "${word}"...` });
+    await sock.sendMessage(jid, { text: `Looking up: _"${word}"_...` });
     try {
       const result = await defineWord(word);
       let text = `╭━━━〔 📚 DICTIONARY 〕━━━⬣\n`;
@@ -138,7 +154,7 @@ const searchCommands = {
       text += `╰━━━━━━━━━━━━━━━━━━⬣`;
       await sock.sendMessage(jid, { text });
     } catch (e) {
-      await sock.sendMessage(jid, { text: `❌ ${e.message}` });
+      await sock.sendMessage(jid, { text: `${e.message}` });
     }
   },
 };

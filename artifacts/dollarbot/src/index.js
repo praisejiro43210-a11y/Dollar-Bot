@@ -24,6 +24,27 @@ const DATA_DIR = path.join(__dirname, '../data');
 
 const logger = pino({ level: 'silent' });
 
+// ── Silence noisy libsignal/Baileys cryptographic session dumps ───────────
+const originalLog = console.log;
+console.log = function (...args) {
+  const str = args.map(a => {
+    if (a && typeof a === 'object') {
+      try { return JSON.stringify(a); } catch (_) { return String(a); }
+    }
+    return String(a);
+  }).join(' ');
+  if (
+    str.includes('Closing session:') ||
+    str.includes('SessionEntry') ||
+    str.includes('currentRatchet') ||
+    str.includes('registrationId:') ||
+    str.includes('ephemeralKeyPair')
+  ) {
+    return; // Silently drop internal signal library dumps
+  }
+  originalLog.apply(console, args);
+};
+
 // ── In-memory message store (fixes 'Waiting for this message' in groups) ───
 const msgStore = makeInMemoryStore({ logger });
 
@@ -31,17 +52,16 @@ const msgStore = makeInMemoryStore({ logger });
 global.isAutoLikeActive = true;
 setInterval(() => {
   global.isAutoLikeActive = !global.isAutoLikeActive;
-}, 60000); // Toggle every 60 seconds (1 min ON, 1 min OFF)
+}, 60000);
 
-
-// ── Dummy HTTP Server for Render Web Service ─────────────────────────────
+// ── Dummy HTTP Server for Render / Railway ───────────────────────────────
 const PORT = process.env.PORT || 3000;
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end('DollarBot V5 is Alive & Running!');
 });
 server.listen(PORT, () => {
-  console.log(`\x1b[32m🌐 Dummy HTTP server running on port ${PORT} (Required for Render Web Service)\x1b[0m`);
+  console.log(`\x1b[32m[HTTP] Keep-alive server on port ${PORT}\x1b[0m`);
 });
 
 function ask(prompt) {
@@ -92,24 +112,24 @@ async function startBot(method, phone) {
       const raw = await ask('Your number (NO + sign, digits only): ');
       phoneNumber = raw.replace(/\D/g, '');
       if (phoneNumber.length < 7) {
-        console.log('\x1b[31m❌ Number too short. Restart and try again.\x1b[0m');
+        console.log('\x1b[31mNumber too short. Restart and try again.\x1b[0m');
         process.exit(1);
       }
       usePairing = true;
       savedMethod = true;
       savedPhone = phoneNumber;
-      console.log(`\n\x1b[32m✅ Number accepted: +${phoneNumber}\x1b[0m`);
-      console.log('\x1b[33m⏳ Connecting to WhatsApp... your pairing code will appear in a few seconds.\x1b[0m\n');
+      console.log(`\n\x1b[32mNumber accepted: +${phoneNumber}\x1b[0m`);
+      console.log('\x1b[33mConnecting to WhatsApp — pairing code will appear shortly...\x1b[0m\n');
     } else {
       usePairing = false;
       savedMethod = false;
-      console.log('\n\x1b[33m📷 QR code will appear below. Scan it within 60 seconds.\x1b[0m');
-      console.log('\x1b[33m   WhatsApp → Settings → Linked Devices → Link a Device\x1b[0m\n');
+      console.log('\n\x1b[33mQR code will appear below. Scan within 60 seconds.\x1b[0m');
+      console.log('\x1b[33mWhatsApp → Settings → Linked Devices → Link a Device\x1b[0m\n');
     }
   } else if (hasSession) {
     usePairing = savedMethod || false;
     phoneNumber = savedPhone;
-    console.log('\x1b[32m✅ Session found — reconnecting...\x1b[0m\n');
+    console.log('\x1b[32mSession found — reconnecting...\x1b[0m\n');
   }
 
   const sock = makeWASocket({
@@ -120,7 +140,6 @@ async function startBot(method, phone) {
     },
     logger,
     printQRInTerminal: !usePairing,
-    // Use recognized browser name — unknown names cause decryption errors in groups
     browser: Browsers.ubuntu('Chrome'),
     connectTimeoutMs: 60000,
     defaultQueryTimeoutMs: 60000,
@@ -130,9 +149,8 @@ async function startBot(method, phone) {
     markOnlineOnConnect: true,
     syncFullHistory: false,
     fireInitQueries: true,
-    // Do NOT ignore status@broadcast — needed for auto-like to work
-    shouldIgnoreJid: jid => jid !== 'status@broadcast' && isJidBroadcast(jid),
-    // getMessage must return real msg data so group session keys can be retried
+    // Only skip non-status broadcast JIDs (newsletters, etc.) — NOT groups
+    shouldIgnoreJid: jid => isJidBroadcast(jid) && jid !== 'status@broadcast',
     getMessage: async (key) => {
       const stored = msgStore.messages[key.remoteJid];
       if (stored) {
@@ -143,37 +161,28 @@ async function startBot(method, phone) {
     },
   });
 
-  // Bind store to socket events so it caches messages for getMessage
+  // Bind store so it caches messages for group key retries
   msgStore.bind(sock.ev);
 
-
-  // ── Register all event listeners first ──────────────────────────────────
-
+  // ── Connection updates ───────────────────────────────────────────────────
   sock.ev.on('connection.update', async update => {
     const { connection, lastDisconnect } = update;
 
     if (connection === 'open') {
       reconnectDelay = 3000;
       console.log('\x1b[32m╔══════════════════════════════╗\x1b[0m');
-      console.log('\x1b[32m║  ✅  DOLLARBOT V5 ONLINE!    ║\x1b[0m');
-      console.log('\x1b[32m╠══════════════════════════════╣\x1b[0m');
-      console.log(`\x1b[32m║\x1b[0m  Engine : ${config.engine}         \x1b[32m║\x1b[0m`);
-      console.log(`\x1b[32m║\x1b[0m  Version: ${config.version}             \x1b[32m║\x1b[0m`);
+      console.log('\x1b[32m║   DOLLARBOT V5 ONLINE!       ║\x1b[0m');
       console.log('\x1b[32m╚══════════════════════════════╝\x1b[0m\n');
+      // Notify all owner numbers
       for (const num of config.ownerNumbers) {
         try {
           await sock.sendMessage(`${num}@s.whatsapp.net`, {
             text:
-              `╭━━━〔 💵 DOLLARBOT V5 ONLINE 〕━━━⬣\n` +
-              `┃ ✦ Status  : Online ✅\n` +
-              `┃ ✦ Engine  : ${config.engine}\n` +
-              `┃ ✦ Version : ${config.version}\n` +
-              `┃ ✦ AI Mem  : Active\n` +
-              `┃ ✦ Search  : Ready\n` +
-              `┃ ✦ TTS     : Ready\n` +
-              `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
-              `Type *.menu* to see all commands!\n` +
-              `«💵 DollarBot V5 — Smart • Fast • Limitless»`,
+              `*DollarBot V5 is Online*\n\n` +
+              `- Engine: ${config.engine}\n` +
+              `- Version: ${config.version}\n` +
+              `- Status: Ready\n\n` +
+              `Type *.menu* to see all commands.`,
           });
         } catch (_) {}
       }
@@ -182,33 +191,21 @@ async function startBot(method, phone) {
     if (connection === 'close') {
       const code = new Boom(lastDisconnect?.error)?.output?.statusCode;
       const loggedOut = code === DisconnectReason.loggedOut;
-      console.log(`\x1b[31m⚠️  Connection closed. Code: ${code}\x1b[0m`);
+      console.log(`\x1b[31mConnection closed. Code: ${code}\x1b[0m`);
 
       if (loggedOut) {
-        console.log('\x1b[31m🚪 Logged out — clearing session and restarting...\x1b[0m');
+        console.log('\x1b[31mLogged out — clearing session and restarting...\x1b[0m');
         try { fs.rmSync(AUTH_DIR, { recursive: true, force: true }); } catch (_) {}
         fs.mkdirSync(AUTH_DIR, { recursive: true });
         savedMethod = undefined;
         savedPhone = undefined;
         setTimeout(() => startBot(undefined, undefined), 2000);
       } else if (code === DisconnectReason.connectionReplaced) {
-        console.log('\x1b[31m╔════════════════════════════════════════════════════════════╗\x1b[0m');
-        console.log('\x1b[31m║ ❌ CONNECTION REPLACED (CODE: 440)                         ║\x1b[0m');
-        console.log('\x1b[31m╠════════════════════════════════════════════════════════════╣\x1b[0m');
-        console.log('\x1b[31m║ Another bot instance, server (e.g. Replit), or background  ║\x1b[0m');
-        console.log('\x1b[31m║ process is actively running with this exact same session!  ║\x1b[0m');
-        console.log('\x1b[31m║                                                            ║\x1b[0m');
-        console.log('\x1b[31m║ To prevent an infinite reconnect loop, this instance will  ║\x1b[0m');
-        console.log('\x1b[31m║ not auto-reconnect.                                        ║\x1b[0m');
-        console.log('\x1b[31m║                                                            ║\x1b[0m');
-        console.log('\x1b[31m║ 👉 HOW TO FIX:                                             ║\x1b[0m');
-        console.log('\x1b[31m║ 1. Stop the bot on Replit or other cloud servers.          ║\x1b[0m');
-        console.log('\x1b[31m║ 2. Kill background Node processes (taskkill /F /IM node.exe)║\x1b[0m');
-        console.log('\x1b[31m║ 3. Or delete auth_info_baileys/ folder to start fresh.     ║\x1b[0m');
-        console.log('\x1b[31m╚════════════════════════════════════════════════════════════╝\x1b[0m\n');
+        console.log('\x1b[31mConnection replaced by another instance. Exiting.\x1b[0m');
+        console.log('\x1b[33mFix: Stop other bot instances, then restart.\x1b[0m');
         process.exit(1);
       } else {
-        console.log(`\x1b[33m🔄 Reconnecting in ${(reconnectDelay / 1000).toFixed(0)}s...\x1b[0m`);
+        console.log(`\x1b[33mReconnecting in ${(reconnectDelay / 1000).toFixed(0)}s...\x1b[0m`);
         const delay = reconnectDelay;
         reconnectDelay = Math.min(reconnectDelay * 1.5, 30000);
         setTimeout(() => startBot(usePairing, phoneNumber), delay);
@@ -218,19 +215,33 @@ async function startBot(method, phone) {
 
   sock.ev.on('creds.update', saveCreds);
 
+  // ── Message handler ──────────────────────────────────────────────────────
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return;
     for (const m of messages) {
       if (!m.message) continue;
       const jid = m.key.remoteJid;
-      // Always process status@broadcast for auto-like
+
+      // Always process status@broadcast (for auto-like)
       if (jid === 'status@broadcast') {
         await handleMessage(sock, m);
         continue;
       }
-      const body = m.message?.conversation || m.message?.extendedTextMessage?.text || m.message?.imageMessage?.caption || m.message?.videoMessage?.caption || '';
-      // Allow owner's own commands (fromMe + prefix) through. Skip other self-messages.
-      if (m.key.fromMe && !body.startsWith(config.prefix)) continue;
+
+      const body =
+        m.message?.conversation ||
+        m.message?.extendedTextMessage?.text ||
+        m.message?.imageMessage?.caption ||
+        m.message?.videoMessage?.caption || '';
+
+      // For fromMe messages: only allow if they start with prefix (owner commands)
+      // OR if it's a DM to self (owner chatting with themselves — bot responds)
+      if (m.key.fromMe) {
+        const isSelfChat = jid === sock.user?.id?.split(':')[0] + '@s.whatsapp.net' ||
+                           jid === sock.user?.id?.split('@')[0] + '@s.whatsapp.net';
+        if (!body.startsWith(config.prefix) && !isSelfChat) continue;
+      }
+
       await handleMessage(sock, m);
     }
   });
@@ -239,60 +250,41 @@ async function startBot(method, phone) {
     await handleGroupParticipants(sock, update);
   });
 
-  // ── Pairing code: request after socket has time to connect ──────────────
-  // We wait 5 seconds (not relying on QR event, which can be unreliable).
-  // This gives Baileys enough time to complete the WebSocket handshake.
+  // ── Pairing code request ─────────────────────────────────────────────────
   if (usePairing && !hasSession && phoneNumber) {
     setTimeout(async () => {
-      console.log('\x1b[33m⏳ Requesting pairing code from WhatsApp...\x1b[0m\n');
+      console.log('\x1b[33mRequesting pairing code from WhatsApp...\x1b[0m\n');
       let attempts = 0;
       const tryCode = async () => {
         try {
           const code = await sock.requestPairingCode(phoneNumber);
           const fmt = code?.match(/.{1,4}/g)?.join('-') || code;
-
           console.log('\x1b[32m╔══════════════════════════════════════╗\x1b[0m');
-          console.log('\x1b[32m║         🔑  YOUR PAIRING CODE        ║\x1b[0m');
+          console.log('\x1b[32m║         YOUR PAIRING CODE            ║\x1b[0m');
           console.log('\x1b[32m╠══════════════════════════════════════╣\x1b[0m');
-          console.log('\x1b[32m║\x1b[0m                                      \x1b[32m║\x1b[0m');
           console.log(`\x1b[32m║\x1b[0m   Code  :  \x1b[33;1m${fmt}\x1b[0m             \x1b[32m║\x1b[0m`);
           console.log(`\x1b[32m║\x1b[0m   Number:  +${phoneNumber}          \x1b[32m║\x1b[0m`);
-          console.log('\x1b[32m║\x1b[0m                                      \x1b[32m║\x1b[0m');
           console.log('\x1b[32m╠══════════════════════════════════════╣\x1b[0m');
-          console.log('\x1b[32m║\x1b[0m  📱  HOW TO ENTER THE CODE:          \x1b[32m║\x1b[0m');
-          console.log('\x1b[32m║\x1b[0m                                      \x1b[32m║\x1b[0m');
           console.log('\x1b[32m║\x1b[0m  1. Open WhatsApp on your phone      \x1b[32m║\x1b[0m');
-          console.log('\x1b[32m║\x1b[0m  2. Tap ⋮  → Settings               \x1b[32m║\x1b[0m');
-          console.log('\x1b[32m║\x1b[0m  3. Tap "Linked Devices"             \x1b[32m║\x1b[0m');
-          console.log('\x1b[32m║\x1b[0m  4. Tap "Link a Device"              \x1b[32m║\x1b[0m');
-          console.log('\x1b[32m║\x1b[0m  5. Tap "Link with phone number"     \x1b[32m║\x1b[0m');
-          console.log('\x1b[32m║\x1b[0m  6. Select your country, enter       \x1b[32m║\x1b[0m');
-          console.log('\x1b[32m║\x1b[0m     number WITHOUT leading zero      \x1b[32m║\x1b[0m');
-          console.log(`\x1b[32m║\x1b[0m  7. Enter code: \x1b[33;1m${fmt}\x1b[0m         \x1b[32m║\x1b[0m`);
-          console.log('\x1b[32m║\x1b[0m                                      \x1b[32m║\x1b[0m');
-          console.log('\x1b[32m║\x1b[0m  ⚠️  Code expires in ~3 minutes!     \x1b[32m║\x1b[0m');
+          console.log('\x1b[32m║\x1b[0m  2. Tap menu → Settings              \x1b[32m║\x1b[0m');
+          console.log('\x1b[32m║\x1b[0m  3. Linked Devices → Link a Device   \x1b[32m║\x1b[0m');
+          console.log('\x1b[32m║\x1b[0m  4. Link with phone number           \x1b[32m║\x1b[0m');
+          console.log(`\x1b[32m║\x1b[0m  5. Enter code: \x1b[33;1m${fmt}\x1b[0m         \x1b[32m║\x1b[0m`);
+          console.log('\x1b[32m║\x1b[0m  Code expires in ~3 minutes!         \x1b[32m║\x1b[0m');
           console.log('\x1b[32m╚══════════════════════════════════════╝\x1b[0m\n');
         } catch (e) {
           attempts++;
-          if (attempts < 3) {
-            console.log(`\x1b[33m⚠️  Code request failed (${e.message}). Retrying in 5s... (${attempts}/3)\x1b[0m`);
+          if (attempts < 5) {
+            console.log(`\x1b[33mCode request failed (${e.message}). Retrying in 5s... (${attempts}/5)\x1b[0m`);
             setTimeout(tryCode, 5000);
           } else {
-            console.log('\x1b[31m╔══════════════════════════════════════╗\x1b[0m');
-            console.log('\x1b[31m║  ❌  PAIRING CODE FAILED             ║\x1b[0m');
-            console.log('\x1b[31m╠══════════════════════════════════════╣\x1b[0m');
-            console.log('\x1b[31m║\x1b[0m  Reason: ' + (e.message || 'Unknown').slice(0, 28).padEnd(30) + '\x1b[31m║\x1b[0m');
-            console.log('\x1b[31m╠══════════════════════════════════════╣\x1b[0m');
-            console.log('\x1b[31m║\x1b[0m  💡 TIP: Restart the bot and use   \x1b[31m║\x1b[0m');
-            console.log('\x1b[31m║\x1b[0m     option 1 (QR Code) instead.    \x1b[31m║\x1b[0m');
-            console.log('\x1b[31m║\x1b[0m  QR code works with ALL WhatsApp   \x1b[31m║\x1b[0m');
-            console.log('\x1b[31m║\x1b[0m  versions and is more reliable.    \x1b[31m║\x1b[0m');
-            console.log('\x1b[31m╚══════════════════════════════════════╝\x1b[0m\n');
+            console.log('\x1b[31mPairing code failed after 5 attempts.\x1b[0m');
+            console.log('\x1b[33mTip: Restart and use option 1 (QR Code) instead — it is more reliable.\x1b[0m\n');
           }
         }
       };
       tryCode();
-    }, 5000);
+    }, 8000); // Wait 8s for WebSocket handshake to complete
   }
 
   // ── Global error handlers ────────────────────────────────────────────────
