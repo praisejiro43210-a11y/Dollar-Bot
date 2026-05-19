@@ -74,6 +74,16 @@ onlyBuiltDependencies:
   - esbuild
   - msw
   - unrs-resolver
+  - btch-downloader
+
+allowBuilds:
+  protobufjs: true
+  '@swc/core': true
+  esbuild: true
+  msw: true
+  unrs-resolver: true
+  btch-downloader: true
+
 
 overrides:
   # replit uses linux-x64 only, we can exclude all other platforms
