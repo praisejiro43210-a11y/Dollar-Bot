@@ -36,19 +36,18 @@ function extractBody(msg) {
 }
 
 function extractSender(msg, isGroup) {
+  if (isGroup) {
+    return msg.key.participant || msg.key.remoteJid;
+  }
   if (msg.key.fromMe) {
     return config.ownerNumbers[0] + '@s.whatsapp.net';
   }
-  if (isGroup) {
-    return msg.key.participant || msg.participant || msg.key.remoteJid || '';
-  }
-  return msg.key.remoteJid || '';
+  return msg.key.remoteJid;
 }
 
 function isOwnerJid(sender) {
   if (!sender) return false;
-  const cleanSender = sender.split(':')[0].split('@')[0];
-  return config.ownerNumbers.some(num => cleanSender === num || sender.includes(num));
+  return config.ownerNumbers.some(num => sender.includes(num));
 }
 
 async function isBotAdmin(sock, jid) {
@@ -99,7 +98,7 @@ function getRamInfo() {
 }
 
 // ── Rotating menu sender ───────────────────────────────────────────────────
-async function sendMenu(sock, jid, speedMs, msg) {
+async function sendMenu(sock, jid, speedMs) {
   const ram = getRamInfo();
   const uptime = getUptime();
   const autoReply = store.get('autoreply') ? 'ON' : 'OFF';
@@ -270,7 +269,7 @@ async function sendMenu(sock, jid, speedMs, msg) {
   try {
     if (fs.existsSync(imgPath)) {
       const img = fs.readFileSync(imgPath);
-      const sendPromise = sock.sendMessage(jid, { image: img, caption }, { quoted: msg });
+      const sendPromise = sock.sendMessage(jid, { image: img, caption });
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Media timeout')), 8000)
       );
@@ -280,7 +279,7 @@ async function sendMenu(sock, jid, speedMs, msg) {
   } catch (err) {
     console.log('[Menu] Image send failed, falling back to text:', err.message);
   }
-  await sock.sendMessage(jid, { text: caption }, { quoted: msg });
+  await sock.sendMessage(jid, { text: caption });
 }
 
 function ownerOnly(sock, jid) {
@@ -339,7 +338,7 @@ async function handleMessage(sock, msg) {
       // ── Menu ────────────────────────────────────────────────────────────
       case 'menu': case 'help': case 'start': {
         const speed = Date.now() - cmdStart;
-        await sendMenu(sock, jid, speed, msg);
+        await sendMenu(sock, jid, speed);
         break;
       }
 
