@@ -193,9 +193,9 @@ const groupCommands = {
     if (!['on', 'off'].includes(setting)) {
       return sock.sendMessage(jid, { text: '❌ Usage: .antilink on/off' });
     }
-    const antilinkGroups = store.get('antilinkGroups') || {};
+    const antilinkGroups = (await store.get('antilinkGroups')) || {};
     antilinkGroups[jid] = setting === 'on';
-    store.set('antilinkGroups', antilinkGroups);
+    await store.set('antilinkGroups', antilinkGroups);
     await sock.sendMessage(jid, {
       text: `🔗 Anti-Link is now *${setting.toUpperCase()}* ${setting === 'on' ? '✅' : '❌'}\n${setting === 'on' ? 'Members sending links will be removed.' : 'Link detection disabled.'}`,
     });
@@ -208,9 +208,9 @@ const groupCommands = {
     if (!['on', 'off'].includes(setting)) {
       return sock.sendMessage(jid, { text: '❌ Usage: .welcome on/off' });
     }
-    const welcomeGroups = store.get('welcomeGroups') || {};
+    const welcomeGroups = (await store.get('welcomeGroups')) || {};
     welcomeGroups[jid] = setting === 'on';
-    store.set('welcomeGroups', welcomeGroups);
+    await store.set('welcomeGroups', welcomeGroups);
     await sock.sendMessage(jid, {
       text: `👋 Welcome message is now *${setting.toUpperCase()}* ${setting === 'on' ? '✅' : '❌'}`,
     });

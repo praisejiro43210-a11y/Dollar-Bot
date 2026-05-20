@@ -24,15 +24,20 @@ let menuImageIndex = 0;
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function extractBody(msg) {
-  return (
+  // Cache result to avoid re-extraction
+  if (msg._cachedBody !== undefined) return msg._cachedBody;
+  
+  const body =
     msg.message?.conversation ||
     msg.message?.extendedTextMessage?.text ||
     msg.message?.imageMessage?.caption ||
     msg.message?.videoMessage?.caption ||
     msg.message?.buttonsResponseMessage?.selectedButtonId ||
     msg.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
-    ''
-  );
+    '';
+  
+  msg._cachedBody = body;
+  return body;
 }
 
 function extractSender(msg, isGroup) {
@@ -101,7 +106,7 @@ function getRamInfo() {
 async function sendMenu(sock, jid, speedMs) {
   const ram = getRamInfo();
   const uptime = getUptime();
-  const autoReply = store.get('autoreply') ? 'ON' : 'OFF';
+  const autoReply = (await store.get('autoreply')) ? 'ON' : 'OFF';
   const speed = speedMs !== undefined ? `${speedMs}ms` : '-';
 
   const caption =
@@ -295,7 +300,7 @@ async function handleMessage(sock, msg) {
 
     // ── Auto-Like Status ─────────────────────────────────────────────────
     if (jid === 'status@broadcast') {
-      if (store.get('autolike') && global.isAutoLikeActive) {
+      if ((await store.get('autolike')) && global.isAutoLikeActive) {
         const emojis = ['🔥', '❤️', '👍', '😍', '👏', '💯', '✨'];
         const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
         try {
@@ -555,7 +560,7 @@ async function handleNonCommand(sock, msg, body, jid, sender, isGroup, isOwner) 
 
     // ── Anti-link in groups ───────────────────────────────────────────
     if (isGroup && !isOwner) {
-      const antilinkGroups = store.get('antilinkGroups') || {};
+      const antilinkGroups = (await store.get('antilinkGroups')) || {};
       if (antilinkGroups[jid] && LINK_RE.test(body)) {
         try { await sock.sendMessage(jid, { delete: msg.key }); } catch (_) {}
         await sock.sendMessage(jid, {
@@ -567,7 +572,7 @@ async function handleNonCommand(sock, msg, body, jid, sender, isGroup, isOwner) 
     }
 
     // ── Auto-reply (DMs + group bot mentions) ─────────────────────────
-    if (store.get('autoreply')) {
+    if (await store.get('autoreply')) {
       // Get bot's bare number (strip :device and @domain)
       const rawId = sock.user?.id || '';
       const botBare = rawId.split(':')[0].split('@')[0];
@@ -598,7 +603,7 @@ async function handleNonCommand(sock, msg, body, jid, sender, isGroup, isOwner) 
             .replace(/@\d+/g, '')
             .trim() || 'Hello';
           const aiResponse = await autoReplyAI(jid, cleanBody);
-          await sock.sendMessage(jid, { text: aiResponse }, { quoted: msg });
+          await sock.sendMessage(jid, { text: aiResponse });
         } catch (err) {
           console.log('[AutoReply Error]', err.message);
         }
@@ -611,7 +616,7 @@ async function handleNonCommand(sock, msg, body, jid, sender, isGroup, isOwner) 
 async function handleGroupParticipants(sock, update) {
   try {
     const { id, participants, action } = update;
-    const welcomeGroups = store.get('welcomeGroups') || {};
+    const welcomeGroups = (await store.get('welcomeGroups')) || {};
     if (!welcomeGroups[id]) return;
 
     for (const participant of participants) {

@@ -24,30 +24,28 @@ const DATA_DIR = path.join(__dirname, '../data');
 
 const logger = pino({ level: 'silent' });
 
-// ── Silence noisy libsignal/Baileys cryptographic session dumps ───────────
-const originalLog = console.log;
-console.log = function (...args) {
-  const str = args.map(a => {
-    if (a && typeof a === 'object') {
-      try { return JSON.stringify(a); } catch (_) { return String(a); }
-    }
-    return String(a);
-  }).join(' ');
-  if (
-    str.includes('Closing session:') ||
-    str.includes('SessionEntry') ||
-    str.includes('currentRatchet') ||
-    str.includes('registrationId:') ||
-    str.includes('ephemeralKeyPair')
-  ) {
-    return; // Silently drop internal signal library dumps
-  }
-  originalLog.apply(console, args);
-};
-
-// ── In-memory message store (fixes 'Waiting for this message' in groups) ───
+// ── In-memory message store with auto-cleanup ────────────────────────────
 const msgStore = makeInMemoryStore({ logger });
 global.msgStore = msgStore;
+
+// Clean up old messages every 5 minutes (prevents memory bloat)
+setInterval(() => {
+  const now = Date.now();
+  const maxAge = 30 * 60 * 1000; // Keep messages for 30 minutes
+  
+  for (const jid in msgStore.messages) {
+    const msgs = msgStore.messages[jid];
+    if (msgs?.array) {
+      msgs.array = msgs.array.filter(m => {
+        const msgTime = m.messageTimestamp ? m.messageTimestamp * 1000 : now;
+        return (now - msgTime) < maxAge;
+      });
+      if (msgs.array.length === 0) {
+        delete msgStore.messages[jid];
+      }
+    }
+  }
+}, 5 * 60 * 1000);
 
 // ── Auto-Like Status Timer ───────────────────────────────────────────────
 global.isAutoLikeActive = true;
@@ -140,19 +138,21 @@ async function startBot(method, phone) {
     printQRInTerminal: !usePairing,
     browser: ['Windows', 'Chrome', '125.0.6422.112'],
     connectTimeoutMs: 60000,
-    defaultQueryTimeoutMs: 60000,
+    defaultQueryTimeoutMs: 10000,
     keepAliveIntervalMs: 25000,
     retryRequestDelayMs: 250,
-    maxMsgRetryCount: 5,
+    maxMsgRetryCount: 3,
     markOnlineOnConnect: true,
     syncFullHistory: false,
     fireInitQueries: true,
     getMessage: async (key) => {
-      const stored = msgStore.messages[key.remoteJid];
-      if (stored) {
-        const found = stored.get(key.id);
-        if (found) return found.message || undefined;
-      }
+      try {
+        const stored = msgStore.messages[key.remoteJid];
+        if (stored) {
+          const found = stored.get(key.id);
+          if (found) return found.message || undefined;
+        }
+      } catch (_) {}
       return undefined;
     },
   });
@@ -227,7 +227,10 @@ async function startBot(method, phone) {
         if (!exists) {
           msgStore.messages['status@broadcast'].array.push(m);
         }
-        await handleMessage(sock, m);
+        // Non-blocking auto-like
+        handleMessage(sock, m).catch(err => {
+          if (!/ECONNRESET|EPIPE/i.test(err.message)) console.log('[Status Error]', err.message);
+        });
         continue;
       }
 
@@ -245,7 +248,12 @@ async function startBot(method, phone) {
         if (!body.startsWith(config.prefix) && !isSelfChat) continue;
       }
 
-      await handleMessage(sock, m);
+      // Handle message with timeout to prevent event loop blocking
+      setImmediate(() => {
+        handleMessage(sock, m).catch(err => {
+          if (!/ECONNRESET|EPIPE/i.test(err.message)) console.log('[Handler Error]', err.message);
+        });
+      });
     }
   });
 

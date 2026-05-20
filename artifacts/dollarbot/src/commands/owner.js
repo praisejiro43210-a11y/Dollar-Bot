@@ -79,7 +79,7 @@ const ownerCommands = {
     if (!['on', 'off'].includes(val)) {
       return sock.sendMessage(jid, { text: '❌ Usage: .autoreply on/off' });
     }
-    store.set('autoreply', val === 'on');
+    await store.set('autoreply', val === 'on');
     await sock.sendMessage(jid, {
       text: `*AutoReply is now ${val.toUpperCase()}*\n\n${val === 'on' ? 'Bot will respond to DMs and group mentions automatically.' : 'AutoReply disabled.'}`,
     });
@@ -91,7 +91,7 @@ const ownerCommands = {
     if (!['on', 'off'].includes(val)) {
       return sock.sendMessage(jid, { text: 'Usage: .autolike on/off' });
     }
-    store.set('autolike', val === 'on');
+    await store.set('autolike', val === 'on');
     await sock.sendMessage(jid, {
       text: `*AutoLike Status is now ${val.toUpperCase()}*\n\n${val === 'on' ? 'Will auto-react to statuses (cycles on/off every 60s to stay safe).' : 'Auto-like disabled.'}`,
     });

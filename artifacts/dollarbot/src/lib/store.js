@@ -1,45 +1,67 @@
-const fs = require('fs');
+const fs = require('fs').promises;
 const path = require('path');
 
 const storePath = path.join(__dirname, '../../data/store.json');
+let cachedData = null;
+let isWriting = false;
+const writeQueue = [];
 
-function ensureDir() {
+async function ensureDir() {
   const dir = path.dirname(storePath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  try {
+    await fs.mkdir(dir, { recursive: true });
+  } catch (_) {}
 }
 
-function load() {
-  ensureDir();
-  if (!fs.existsSync(storePath)) return {};
+async function load() {
+  await ensureDir();
   try {
-    return JSON.parse(fs.readFileSync(storePath, 'utf-8'));
+    const data = await fs.readFile(storePath, 'utf-8');
+    cachedData = JSON.parse(data);
+    return cachedData;
   } catch {
-    return {};
+    return cachedData || {};
   }
 }
 
-function save(data) {
-  ensureDir();
-  fs.writeFileSync(storePath, JSON.stringify(data, null, 2));
+async function save(data) {
+  await ensureDir();
+  if (isWriting) {
+    writeQueue.push(data);
+    return;
+  }
+  isWriting = true;
+  try {
+    await fs.writeFile(storePath, JSON.stringify(data, null, 2));
+    cachedData = data;
+    if (writeQueue.length > 0) {
+      const nextData = writeQueue.shift();
+      isWriting = false;
+      await save(nextData);
+    }
+  } catch {
+  } finally {
+    isWriting = false;
+  }
 }
 
 const store = {
-  get(key) {
-    const data = load();
+  async get(key) {
+    const data = cachedData || (await load());
     return data[key];
   },
-  set(key, value) {
-    const data = load();
+  async set(key, value) {
+    const data = cachedData || (await load());
     data[key] = value;
-    save(data);
+    await save(data);
   },
-  delete(key) {
-    const data = load();
+  async delete(key) {
+    const data = cachedData || (await load());
     delete data[key];
-    save(data);
+    await save(data);
   },
-  getAll() {
-    return load();
+  async getAll() {
+    return cachedData || (await load());
   },
 };
 

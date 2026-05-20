@@ -37,7 +37,7 @@ const userCommands = {
     const jid = msg.key.remoteJid;
     const ram = getRamInfo();
     const uptime = getUptime();
-    const autoReply = store.get('autoreply') ? 'ON' : 'OFF';
+    const autoReply = (await store.get('autoreply')) ? 'ON' : 'OFF';
 
     const start = Date.now();
     const sent = await sock.sendMessage(jid, { text: '...' });
@@ -83,7 +83,7 @@ const userCommands = {
     const jid = msg.key.remoteJid;
     const ram = getRamInfo();
     const uptime = getUptime();
-    const autoReply = store.get('autoreply') ? 'ON' : 'OFF';
+    const autoReply = (await store.get('autoreply')) ? 'ON' : 'OFF';
 
     const start = Date.now();
     const sent = await sock.sendMessage(jid, { text: 'Fetching stats...' });
