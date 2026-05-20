@@ -15,6 +15,10 @@ const groupCommands   = require('./commands/group');
 const searchCommands  = require('./commands/search');
 const extraCommands   = require('./commands/extra');
 const premiumCommands = require('./commands/premium');
+const toolsCommands   = require('./commands/tools');
+const apiCommands     = require('./commands/api');
+const mediaCommands   = require('./commands/media');
+const devCommands     = require('./commands/dev');
 
 const LINK_RE = /(?:https?:\/\/|www\.|chat\.whatsapp\.com\/)[^\s]+/gi;
 
@@ -530,6 +534,70 @@ async function handleMessage(sock, msg) {
         await groupCommands.welcome(sock, msg, args);
         break;
       }
+
+      // ── Tools ────────────────────────────────────────────────────────────
+      case 'hash':         await toolsCommands.hash(sock, msg, args); break;
+      case 'uuid':         await toolsCommands.uuid(sock, msg); break;
+      case 'jsonformat':   await toolsCommands.jsonformat(sock, msg, args); break;
+      case 'textstats':    await toolsCommands.textstats(sock, msg, args); break;
+      case 'dns':          await toolsCommands.dns(sock, msg, args); break;
+      case 'color':        await toolsCommands.color(sock, msg); break;
+      case 'country':      await toolsCommands.country(sock, msg, args); break;
+      case 'ageguess':     await toolsCommands.ageguess(sock, msg, args); break;
+      case 'genderpredict': await toolsCommands.genderpredict(sock, msg, args); break;
+      case 'nickname':     await toolsCommands.nickname(sock, msg, args); break;
+      case 'animalfact':   await toolsCommands.animalfact(sock, msg); break;
+      case 'passcheck':    await toolsCommands.passcheck(sock, msg, args); break;
+
+      // ── API ──────────────────────────────────────────────────────────────
+      case 'pokemon':      await apiCommands.pokemon(sock, msg, args); break;
+      case 'anime':        await apiCommands.anime(sock, msg, args); break;
+      case 'manga':        await apiCommands.manga(sock, msg, args); break;
+      case 'book':         await apiCommands.book(sock, msg, args); break;
+      case 'jokepro':      await apiCommands.jokepro(sock, msg); break;
+      case 'uselessfact':  await apiCommands.uselessfact(sock, msg); break;
+      case 'bbquote':      await apiCommands.bbquote(sock, msg); break;
+      case 'kanye':        await apiCommands.kanye(sock, msg); break;
+      case 'adviceslip':   await apiCommands.adviceslip(sock, msg); break;
+      case 'catfact':      await apiCommands.catfact(sock, msg); break;
+      case 'spacepic':     await apiCommands.spacepic(sock, msg); break;
+      case 'zenquote':     await apiCommands.zenquote(sock, msg); break;
+      case 'weather2':     await apiCommands.weather2(sock, msg, args); break;
+      case 'iplocation':   await apiCommands.iplocation(sock, msg, args); break;
+      case 'crypto':       await apiCommands.crypto(sock, msg, args); break;
+      case 'urlinfo':      await apiCommands.urlinfo(sock, msg, args); break;
+
+      // ── Media ────────────────────────────────────────────────────────────
+      case 'randomcat':    await mediaCommands.randomcat(sock, msg); break;
+      case 'randomdog':    await mediaCommands.randomdog(sock, msg); break;
+      case 'asciiart':     await mediaCommands.asciiart(sock, msg, args); break;
+      case 'randommeme':   await mediaCommands.randommeme(sock, msg); break;
+      case 'abstractart':  await mediaCommands.abstractart(sock, msg); break;
+      case 'qrgen':        await mediaCommands.qrgen(sock, msg, args); break;
+      case 'unsplashrandom': await mediaCommands.unsplashrandom(sock, msg, args); break;
+      case 'flagimg':      await mediaCommands.flagimg(sock, msg, args); break;
+      case 'avatar':       await mediaCommands.avatar(sock, msg, args); break;
+      case 'placeholder':  await mediaCommands.placeholder(sock, msg, args); break;
+      case 'barcode':      await mediaCommands.barcode(sock, msg, args); break;
+      case 'randombird':   await mediaCommands.randombird(sock, msg); break;
+      case 'map':          await mediaCommands.map(sock, msg, args); break;
+      case 'gradient':     await mediaCommands.gradient(sock, msg, args); break;
+
+      // ── Dev ──────────────────────────────────────────────────────────────
+      case 'jsonminify':   await devCommands.jsonminify(sock, msg, args); break;
+      case 'timestamp':    await devCommands.timestamp(sock, msg, args); break;
+      case 'base32':       await devCommands.base32(sock, msg, args); break;
+      case 'jwtdecode':    await devCommands.jwtdecode(sock, msg, args); break;
+      case 'regextest':    await devCommands.regextest(sock, msg, args); break;
+      case 'urlencode':    await devCommands.urlencode(sock, msg, args); break;
+      case 'uuidgen':      await devCommands.uuidgen(sock, msg); break;
+      case 'httpstatus':   await devCommands.httpstatus(sock, msg, args); break;
+      case 'mime':         await devCommands.mime(sock, msg, args); break;
+      case 'langinfo':     await devCommands.langinfo(sock, msg, args); break;
+      case 'randomport':   await devCommands.randomport(sock, msg); break;
+      case 'npmpkg':       await devCommands.npmpkg(sock, msg, args); break;
+      case 'mdpreview':    await devCommands.mdpreview(sock, msg, args); break;
+      case 'gitcommit':    await devCommands.gitcommit(sock, msg, args); break;
 
       default:
         await sock.sendMessage(jid, {
