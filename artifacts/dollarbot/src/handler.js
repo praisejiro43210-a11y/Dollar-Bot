@@ -609,75 +609,44 @@ async function handleMessage(sock, msg) {
       case 'searchimage':  await premiumCommands.searchimage(sock, msg, args); break;
       case 'gnews':        await premiumCommands.gnews(sock, msg, args); break;
 
-      // ── Group ────────────────────────────────────────────────────────────
-      case 'kick': {
-        if (!jid.endsWith('@g.us')) return msg.reply('❌ Groups only.');
-        if (!await getIsSenderAdmin()) return msg.reply('❌ This command is restricted to group admins and the bot owner.');
-        await groupCommands.kick(sock, msg, args, await getIsAdmin());
+      // ── Group (admin-only commands) ──────────────────────────────────────
+      case 'kick':
+      case 'add':
+      case 'promote':
+      case 'demote':
+      case 'mute':
+      case 'unmute':
+      case 'open':
+      case 'close':
+      case 'tagall':
+      case 'everyone':
+      case 'hidetag':
+      case 'grouplink':
+      case 'revoke':
+      case 'setname':
+      case 'setdesc':
+      case 'antilink':
+      case 'welcome': {
+        if (!jid.endsWith('@g.us')) return msg.reply('❌ This command only works in groups.');
+        if (!await getIsSenderAdmin()) return msg.reply('❌ Only group admins can use this command.');
+        await groupCommands[cmd](sock, msg, args);
         break;
       }
-      case 'promote': {
-        if (!jid.endsWith('@g.us')) return msg.reply('❌ Groups only.');
-        if (!await getIsSenderAdmin()) return msg.reply('❌ This command is restricted to group admins and the bot owner.');
-        await groupCommands.promote(sock, msg, args, await getIsAdmin());
-        break;
-      }
-      case 'demote': {
-        if (!jid.endsWith('@g.us')) return msg.reply('❌ Groups only.');
-        if (!await getIsSenderAdmin()) return msg.reply('❌ This command is restricted to group admins and the bot owner.');
-        await groupCommands.demote(sock, msg, args, await getIsAdmin());
-        break;
-      }
-      case 'mute': {
-        if (!jid.endsWith('@g.us')) return msg.reply('❌ Groups only.');
-        if (!await getIsSenderAdmin()) return msg.reply('❌ This command is restricted to group admins and the bot owner.');
-        await groupCommands.mute(sock, msg, await getIsAdmin());
-        break;
-      }
-      case 'unmute': {
-        if (!jid.endsWith('@g.us')) return msg.reply('❌ Groups only.');
-        if (!await getIsSenderAdmin()) return msg.reply('❌ This command is restricted to group admins and the bot owner.');
-        await groupCommands.unmute(sock, msg, await getIsAdmin());
-        break;
-      }
-      case 'tagall': {
-        if (!jid.endsWith('@g.us')) return msg.reply('❌ Groups only.');
-        if (!await getIsSenderAdmin()) return msg.reply('❌ This command is restricted to group admins and the bot owner.');
-        await groupCommands.tagall(sock, msg);
-        break;
-      }
-      case 'everyone': {
-        if (!jid.endsWith('@g.us')) return msg.reply('❌ Groups only.');
-        if (!await getIsSenderAdmin()) return msg.reply('❌ This command is restricted to group admins and the bot owner.');
-        await groupCommands.everyone(sock, msg, args);
-        break;
-      }
-      case 'hidetag': {
-        if (!jid.endsWith('@g.us')) return msg.reply('❌ Groups only.');
-        if (!await getIsSenderAdmin()) return msg.reply('❌ This command is restricted to group admins and the bot owner.');
-        await groupCommands.hidetag(sock, msg, args);
-        break;
-      }
-      case 'grouplink': {
-        if (!jid.endsWith('@g.us')) return msg.reply('❌ Groups only.');
-        if (!await getIsSenderAdmin()) return msg.reply('❌ This command is restricted to group admins and the bot owner.');
-        await groupCommands.grouplink(sock, msg, await getIsAdmin());
-        break;
-      }
+      // Group info commands (anyone can use)
       case 'groupinfo': {
+        if (!jid.endsWith('@g.us')) return msg.reply('❌ This command only works in groups.');
         await groupCommands.groupinfo(sock, msg);
         break;
       }
-      case 'antilink': {
-        if (!jid.endsWith('@g.us')) return msg.reply('❌ Groups only.');
-        if (!await getIsSenderAdmin()) return msg.reply('❌ This command is restricted to group admins and the bot owner.');
-        await groupCommands.antilink(sock, msg, args);
+      case 'admins': {
+        if (!jid.endsWith('@g.us')) return msg.reply('❌ This command only works in groups.');
+        await groupCommands.admins(sock, msg);
         break;
       }
-      case 'welcome': {
-        if (!jid.endsWith('@g.us')) return msg.reply('❌ Groups only.');
-        if (!await getIsSenderAdmin()) return msg.reply('❌ This command is restricted to group admins and the bot owner.');
-        await groupCommands.welcome(sock, msg, args);
+      case 'delete': {
+        if (!jid.endsWith('@g.us') && !await getIsSenderAdmin())
+          return msg.reply('❌ Only admins can delete messages.');
+        await groupCommands.delete(sock, msg);
         break;
       }
 
