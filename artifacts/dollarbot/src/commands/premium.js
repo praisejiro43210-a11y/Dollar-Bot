@@ -1,6 +1,7 @@
 const fetch = require('node-fetch');
 const pollinations = require('../lib/pollinations');
 const config = require('../config');
+const { getMentionedJids, getQuotedParticipant } = require('../lib/messages');
 
 const premiumCommands = {
   // ── 1. .enhance <prompt> ──────────────────────────────────────────────
@@ -153,10 +154,8 @@ const premiumCommands = {
   // ── 7. .getpp @user ────────────────────────────────────────────────────
   async getpp(sock, msg) {
     const jid = msg.key.remoteJid;
-    let target = msg.message?.extendedTextMessage?.contextInfo?.participant;
-    if (!target && msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.length) {
-      target = msg.message.extendedTextMessage.contextInfo.mentionedJid[0];
-    }
+    let target = getQuotedParticipant(msg);
+    if (!target) target = getMentionedJids(msg)[0];
     if (!target) return sock.sendMessage(jid, { text: '❌ Reply to a user or @tag them to fetch their high-definition profile picture.' });
 
     await sock.sendMessage(jid, { text: '_Retrieving profile picture from servers..._' });
@@ -570,7 +569,7 @@ const premiumCommands = {
     const jid = msg.key.remoteJid;
     if (!args.length) return sock.sendMessage(jid, { text: 'Usage: .searchimage <query>\nExample: .searchimage ferrari sf90' });
     const query = args.join(' ');
-    await sock.sendMessage(jid, { text: `🖼️ *Searching Google Images for:* "${query}"...` });
+    await sock.sendMessage(jid, { text: `*Searching Google Images for:* "${query}"...` });
     try {
       const res = await fetch('https://google.serper.dev/images', {
         method: 'POST',

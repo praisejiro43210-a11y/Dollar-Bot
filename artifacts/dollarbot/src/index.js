@@ -17,6 +17,7 @@ const http = require('http');
 
 const { handleMessage, handleGroupParticipants } = require('./handler');
 const config = require('./config');
+const { extractBody } = require('./lib/messages');
 
 const AUTH_DIR = path.join(__dirname, '../auth_info_baileys');
 const DATA_DIR = path.join(__dirname, '../data');
@@ -227,6 +228,10 @@ async function startBot(method, phone) {
         if (!exists) {
           msgStore.messages['status@broadcast'].array.push(m);
         }
+        // Add reply method for status messages
+        m.reply = async (text, options = {}) => {
+          return sock.sendMessage(jid, { text, ...options }, { quoted: m });
+        };
         // Non-blocking auto-like
         handleMessage(sock, m).catch(err => {
           if (!/ECONNRESET|EPIPE/i.test(err.message)) console.log('[Status Error]', err.message);
@@ -234,11 +239,7 @@ async function startBot(method, phone) {
         continue;
       }
 
-      const body =
-        m.message?.conversation ||
-        m.message?.extendedTextMessage?.text ||
-        m.message?.imageMessage?.caption ||
-        m.message?.videoMessage?.caption || '';
+      const body = extractBody(m);
 
       // For fromMe messages: only allow if they start with prefix (owner commands)
       // OR if it's a DM to self (owner chatting with themselves — bot responds)
@@ -247,6 +248,17 @@ async function startBot(method, phone) {
                            jid === sock.user?.id?.split('@')[0] + '@s.whatsapp.net';
         if (!body.startsWith(config.prefix) && !isSelfChat) continue;
       }
+
+      // ── Add reply method to message (for proper group message handling) ──────
+      m.reply = async (text, options = {}) => {
+        return sock.sendMessage(jid, { text, ...options }, { quoted: m });
+      };
+      m.replyWithImage = async (image, caption = '', options = {}) => {
+        return sock.sendMessage(jid, { image, caption, ...options }, { quoted: m });
+      };
+      m.replyWithDocument = async (document, fileName = '', caption = '', options = {}) => {
+        return sock.sendMessage(jid, { document, fileName, caption, ...options }, { quoted: m });
+      };
 
       // Handle message with timeout to prevent event loop blocking
       setImmediate(() => {

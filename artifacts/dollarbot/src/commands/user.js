@@ -27,10 +27,15 @@ const userCommands = {
   async ping(sock, msg) {
     const jid = msg.key.remoteJid;
     const start = Date.now();
-    const sent = await sock.sendMessage(jid, { text: 'Pinging...' });
+    const sent = await msg.reply('Pinging...');
     const ping = Date.now() - start;
-    await sock.sendMessage(jid, { text: `*Pong!*\nSpeed: *${ping}ms*` });
-    try { await sock.sendMessage(jid, { delete: sent.key }); } catch (_) {}
+    await msg.reply(`*Pong!*\nSpeed: *${ping}ms*`);
+
+    // Some Baileys wrappers don't expose a deletable message key from msg.reply().
+    // Only attempt delete if we have a usable key.
+    try {
+      if (sent?.key) await sock.sendMessage(jid, { delete: sent.key });
+    } catch (_) {}
   },
 
   async alive(sock, msg) {
@@ -40,13 +45,14 @@ const userCommands = {
     const autoReply = (await store.get('autoreply')) ? 'ON' : 'OFF';
 
     const start = Date.now();
-    const sent = await sock.sendMessage(jid, { text: '...' });
+    const sent = await msg.reply('...');
     const speed = Date.now() - start;
-    try { await sock.sendMessage(jid, { delete: sent.key }); } catch (_) {}
+    try {
+      if (sent?.key) await sock.sendMessage(jid, { delete: sent.key });
+    } catch (_) {}
 
-    await sock.sendMessage(jid, {
-      text:
-        `╭━━━〔 💵 𝐃𝐎𝐋𝐋𝐀𝐑𝐁𝐎𝐓 𝐕5 〕━━━⬣\n` +
+    await msg.reply(
+      `╭━━━〔 💵 𝐃𝐎𝐋𝐋𝐀𝐑𝐁𝐎𝐓 𝐕5 〕━━━⬣\n` +
         `┃ ✦ Owner    : ${config.ownerName}\n` +
         `┃ ✦ Country  : ${config.ownerCountry}\n` +
         `┃ ✦ Prefix   : [ ${config.prefix} ]\n` +
@@ -61,22 +67,20 @@ const userCommands = {
         `┃ ✦ Usage    : ${ram.usedGB}GB / ${ram.totalGB}GB\n` +
         `┃ ✦ AutoReply: ${autoReply}\n` +
         `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
-        `«⚡ Developed By Dollar\n⚡ Powered By Dollar Engine»`,
-    });
+        `«⚡ Developed By Dollar\n⚡ Powered By Dollar Engine»`
+    );
   },
 
   async owner(sock, msg) {
     // Only shows the Canada (primary) number — never reveals secondary number
-    const primaryNumber = config.ownerNumbers[0];
-    await sock.sendMessage(msg.key.remoteJid, {
-      text:
-        `╭━━━〔 👑 BOT OWNER 〕━━━⬣\n` +
+    await msg.reply(
+      `╭━━━〔 👑 BOT OWNER 〕━━━⬣\n` +
         `┃ ✦ Name    : ${config.ownerName}\n` +
         `┃ ✦ Country : ${config.ownerCountry}\n` +
         `┃ ✦ Number  : +${config.ownerNumber}\n` +
         `┃ ✦ Link    : wa.me/${config.ownerNumber}\n` +
-        `╰━━━━━━━━━━━━━━━━━━⬣`,
-    });
+        `╰━━━━━━━━━━━━━━━━━━⬣`
+    );
   },
 
   async stats(sock, msg) {
@@ -86,13 +90,14 @@ const userCommands = {
     const autoReply = (await store.get('autoreply')) ? 'ON' : 'OFF';
 
     const start = Date.now();
-    const sent = await sock.sendMessage(jid, { text: 'Fetching stats...' });
+    const sent = await msg.reply('Fetching stats...');
     const speed = Date.now() - start;
-    try { await sock.sendMessage(jid, { delete: sent.key }); } catch (_) {}
+    try {
+      if (sent?.key) await sock.sendMessage(jid, { delete: sent.key });
+    } catch (_) {}
 
-    await sock.sendMessage(jid, {
-      text:
-        `╭━━━〔 📊 BOT STATS 〕━━━⬣\n` +
+    await msg.reply(
+      `╭━━━〔 📊 BOT STATS 〕━━━⬣\n` +
         `┃ ✦ Bot      : ${config.botName} V${config.version}\n` +
         `┃ ✦ Engine   : ${config.engine}\n` +
         `┃ ✦ Speed    : ${speed} ms\n` +
@@ -102,14 +107,13 @@ const userCommands = {
         `┃ ✦ Platform : ${os.platform()} (${os.arch()})\n` +
         `┃ ✦ Node     : ${process.version}\n` +
         `┃ ✦ AutoReply: ${autoReply}\n` +
-        `╰━━━━━━━━━━━━━━━━━━⬣`,
-    });
+        `╰━━━━━━━━━━━━━━━━━━⬣`
+    );
   },
 
   async info(sock, msg) {
-    await sock.sendMessage(msg.key.remoteJid, {
-      text:
-        `╭━━━〔 ℹ️ BOT INFO 〕━━━⬣\n` +
+    await msg.reply(
+      `╭━━━〔 ℹ️ BOT INFO 〕━━━⬣\n` +
         `┃ ✦ Name      : ${config.botName} V${config.version}\n` +
         `┃ ✦ Developer : ${config.ownerName}\n` +
         `┃ ✦ Prefix    : [ ${config.prefix} ]\n` +
@@ -121,67 +125,63 @@ const userCommands = {
         `┃ ✦ Voice     : Dollar Voice\n` +
         `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
         `📖 Type *.menu* to see all commands.\n` +
-        `💵 DollarBot V5 — Smart • Fast • Limitless`,
-    });
+        `💵 DollarBot V5 — Smart • Fast • Limitless`
+    );
   },
 
   async details(sock, msg, sender) {
     const jid = msg.key.remoteJid;
     const isGroup = jid.endsWith('@g.us');
     const pushName = msg.pushName || 'Unknown';
-    await sock.sendMessage(jid, {
-      text:
-        `╭━━━〔 👤 YOUR DETAILS 〕━━━⬣\n` +
+    await msg.reply(
+      `╭━━━〔 👤 YOUR DETAILS 〕━━━⬣\n` +
         `┃ ✦ Name   : ${pushName}\n` +
         `┃ ✦ JID    : ${sender}\n` +
         `┃ ✦ Chat   : ${isGroup ? 'Group' : 'Private'}\n` +
         `┃ ✦ ChatID : ${jid}\n` +
-        `╰━━━━━━━━━━━━━━━━━━⬣`,
-    });
+        `╰━━━━━━━━━━━━━━━━━━⬣`
+    );
   },
 
   async time(sock, msg) {
     const now = new Date();
-    await sock.sendMessage(msg.key.remoteJid, {
-      text:
-        `╭━━━〔 🕐 TIME 〕━━━⬣\n` +
+    await msg.reply(
+      `╭━━━〔 🕐 TIME 〕━━━⬣\n` +
         `┃ ✦ Date     : ${now.toDateString()}\n` +
         `┃ ✦ Time     : ${now.toTimeString().split(' ')[0]}\n` +
         `┃ ✦ Timezone : ${Intl.DateTimeFormat().resolvedOptions().timeZone}\n` +
         `┃ ✦ UTC      : ${now.toUTCString()}\n` +
-        `╰━━━━━━━━━━━━━━━━━━⬣`,
-    });
+        `╰━━━━━━━━━━━━━━━━━━⬣`
+    );
   },
 
   async jid(sock, msg, sender) {
-    await sock.sendMessage(msg.key.remoteJid, {
-      text:
-        `╭━━━〔 🆔 JID INFO 〕━━━⬣\n` +
+    await msg.reply(
+      `╭━━━〔 🆔 JID INFO 〕━━━⬣\n` +
         `┃ ✦ Your JID : ${sender}\n` +
         `┃ ✦ Chat JID : ${msg.key.remoteJid}\n` +
-        `╰━━━━━━━━━━━━━━━━━━⬣`,
-    });
+        `╰━━━━━━━━━━━━━━━━━━⬣`
+    );
   },
 
   async runtime(sock, msg) {
     const uptime = getUptime();
-    await sock.sendMessage(msg.key.remoteJid, {
-      text:
-        `╭━━━〔 ⏱️ RUNTIME 〕━━━⬣\n` +
+    await msg.reply(
+      `╭━━━〔 ⏱️ RUNTIME 〕━━━⬣\n` +
         `┃ ✦ Bot Runtime : ${uptime}\n` +
-        `╰━━━━━━━━━━━━━━━━━━⬣`,
-    });
+        `╰━━━━━━━━━━━━━━━━━━⬣`
+    );
   },
 
   async uptime(sock, msg) {
     const uptime = getUptime();
-    await sock.sendMessage(msg.key.remoteJid, {
-      text:
-        `╭━━━〔 🕐 UPTIME 〕━━━⬣\n` +
+    await msg.reply(
+      `╭━━━〔 🕐 UPTIME 〕━━━⬣\n` +
         `┃ ✦ Uptime : ${uptime}\n` +
-        `╰━━━━━━━━━━━━━━━━━━⬣`,
-    });
+        `╰━━━━━━━━━━━━━━━━━━⬣`
+    );
   },
 };
 
 module.exports = userCommands;
+

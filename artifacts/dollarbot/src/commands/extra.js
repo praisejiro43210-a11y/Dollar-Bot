@@ -10,33 +10,31 @@ const riddleState = {};
 const extraCommands = {
   // ── .lyrics <song> ────────────────────────────────────────────────────
   async lyrics(sock, msg, args) {
-    const jid = msg.key.remoteJid;
-    if (!args.length) return sock.sendMessage(jid, { text: 'Usage: .lyrics <song name>\nExample: .lyrics Bohemian Rhapsody' });
-    await sock.sendMessage(jid, { text: `_Searching lyrics for:_ "${args.join(' ')}"...` });
+    if (!args.length) return msg.reply('Usage: .lyrics <song name>\nExample: .lyrics Bohemian Rhapsody');
+    await msg.reply(`_Searching lyrics for:_ "${args.join(' ')}"...`);
     try {
       const response = await pollinations.textGenerate([
         { role: 'system', content: 'You are a lyrics assistant. Provide the song lyrics if you know them, or the most well-known verse/chorus. Format with song title in *bold*, then lyrics line by line. If you cannot provide full lyrics, give the chorus and mention where to find full lyrics. WhatsApp formatting only.' },
         { role: 'user', content: `Lyrics for: ${args.join(' ')}` },
       ]);
-      await sock.sendMessage(jid, { text: `${response}\n\n_Powered by DollarBot_` });
+      await msg.reply(`${response}\n\n_Powered by DollarBot_`);
     } catch (e) {
-      await sock.sendMessage(jid, { text: `Lyrics Error: ${e.message}` });
+      await msg.reply(`Lyrics Error: ${e.message}`);
     }
   },
 
   // ── .recipe <dish> ────────────────────────────────────────────────────
   async recipe(sock, msg, args) {
-    const jid = msg.key.remoteJid;
-    if (!args.length) return sock.sendMessage(jid, { text: 'Usage: .recipe <dish name>\nExample: .recipe jollof rice' });
-    await sock.sendMessage(jid, { text: `_Finding recipe for:_ "${args.join(' ')}"...` });
+    if (!args.length) return msg.reply('Usage: .recipe <dish name>\nExample: .recipe jollof rice');
+    await msg.reply(`_Finding recipe for:_ "${args.join(' ')}"...`);
     try {
       const response = await pollinations.textGenerate([
         { role: 'system', content: 'You are a professional chef. Give a clear recipe with ingredients and steps. Format: *Dish Name* on first line, then *Ingredients:* as a bullet list (- item), then *Steps:* as numbered list. Keep it concise. WhatsApp formatting only — no tables, no HTML.' },
         { role: 'user', content: `Give me the recipe for: ${args.join(' ')}` },
       ]);
-      await sock.sendMessage(jid, { text: `${response}\n\n_Powered by DollarBot_` });
+      await msg.reply(`${response}\n\n_Powered by DollarBot_`);
     } catch (e) {
-      await sock.sendMessage(jid, { text: `Recipe Error: ${e.message}` });
+      await msg.reply(`Recipe Error: ${e.message}`);
     }
   },
 
@@ -58,39 +56,37 @@ const extraCommands = {
       ]);
       await sock.sendMessage(jid, { text: `*${sign.charAt(0).toUpperCase() + sign.slice(1)} Horoscope*\n\n${response}` });
     } catch (e) {
-      await sock.sendMessage(jid, { text: `Horoscope Error: ${e.message}` });
+      await msg.reply(`Horoscope Error: ${e.message}`);
     }
   },
 
   // ── .rizz ─────────────────────────────────────────────────────────────
   async rizz(sock, msg, args) {
-    const jid = msg.key.remoteJid;
-    await sock.sendMessage(jid, { text: '_Generating rizz..._' });
+    await msg.reply('_Generating rizz..._');
     try {
       const target = args.join(' ') || 'someone special';
       const response = await pollinations.textGenerate([
         { role: 'system', content: 'You generate smooth, charming, creative pickup lines and compliments. Keep it fun and non-offensive. 1-2 sentences max. WhatsApp formatting — use *bold* for punchlines.' },
         { role: 'user', content: `Create a smooth pickup line for: ${target}` },
       ]);
-      await sock.sendMessage(jid, { text: `*Rizz Level: 100*\n\n${response}` });
+      await msg.reply(`*Rizz Level: 100*\n\n${response}`);
     } catch (e) {
-      await sock.sendMessage(jid, { text: `Error: ${e.message}` });
+      await msg.reply(`Error: ${e.message}`);
     }
   },
 
   // ── .roastme ─────────────────────────────────────────────────────────
   async roastme(sock, msg, args) {
-    const jid = msg.key.remoteJid;
     const name = msg.pushName || args.join(' ') || 'You';
-    await sock.sendMessage(jid, { text: '_Warming up the roaster..._' });
+    await msg.reply('_Warming up the roaster..._');
     try {
       const response = await pollinations.textGenerate([
         { role: 'system', content: 'You are a savage comedian. Write a brutal, funny, personalized roast in 2-3 sentences. Use *bold* for punchlines. No offensive slurs — keep it funny, not mean. WhatsApp formatting only.' },
         { role: 'user', content: `Roast this person savagely: "${name}"` },
       ]);
-      await sock.sendMessage(jid, { text: `*Roasting ${name}*\n\n${response}` });
+      await msg.reply(`*Roasting ${name}*\n\n${response}`);
     } catch (e) {
-      await sock.sendMessage(jid, { text: `Error: ${e.message}` });
+      await msg.reply(`Error: ${e.message}`);
     }
   },
 
@@ -212,24 +208,22 @@ const extraCommands = {
 
   // ── .remind <seconds> <message> ───────────────────────────────────────
   async remind(sock, msg, args) {
-    const jid = msg.key.remoteJid;
     if (args.length < 2 || isNaN(args[0])) {
-      return sock.sendMessage(jid, { text: 'Usage: .remind <seconds> <message>\nExample: .remind 30 Take your medicine' });
+      return msg.reply('Usage: .remind <seconds> <message>\nExample: .remind 30 Take your medicine');
     }
     const secs = Math.min(parseInt(args[0]), 3600); // max 1 hour
     const reminder = args.slice(1).join(' ');
-    await sock.sendMessage(jid, { text: `Reminder set for *${secs} seconds*.\n_"${reminder}"_` });
+    await msg.reply(`Reminder set for *${secs} seconds*.\n_"${reminder}"_`);
     setTimeout(async () => {
       try {
-        await sock.sendMessage(jid, { text: `*REMINDER*\n\n${reminder}` });
+        await sock.sendMessage(msg.key.remoteJid, { text: `*REMINDER*\n\n${reminder}` });
       } catch (_) {}
     }, secs * 1000);
   },
 
   // ── .styletext <text> ─────────────────────────────────────────────────
   async styletext(sock, msg, args) {
-    const jid = msg.key.remoteJid;
-    if (!args.length) return sock.sendMessage(jid, { text: 'Usage: .styletext <text>\nExample: .styletext hello world' });
+    if (!args.length) return msg.reply('Usage: .styletext <text>\nExample: .styletext hello world');
     const text = args.join(' ');
     const bold = text.split('').map(c => {
       const code = c.charCodeAt(0);
@@ -238,71 +232,65 @@ const extraCommands = {
       if (code >= 48 && code <= 57) return String.fromCodePoint(code + 120764);
       return c;
     }).join('');
-    await sock.sendMessage(jid, {
-      text: `*Styled Text*\n\nOriginal: ${text}\nStyled: ${bold}`,
-    });
+    await msg.reply(`*Styled Text*\n\nOriginal: ${text}\nStyled: ${bold}`);
   },
 
   // ── .meme (AI-described meme) ─────────────────────────────────────────
   async meme(sock, msg, args) {
-    const jid = msg.key.remoteJid;
-    await sock.sendMessage(jid, { text: '_Generating meme..._' });
+    await msg.reply('_Generating meme..._');
     try {
       const topic = args.join(' ') || 'random';
       const response = await pollinations.textGenerate([
         { role: 'system', content: 'You write funny internet meme-style text. Format as:\nTop text: [top caption]\nBottom text: [bottom caption]\nKeep it funny and relatable. 1-2 lines each.' },
         { role: 'user', content: `Create a meme about: ${topic}` },
       ]);
-      await sock.sendMessage(jid, { text: `*Meme*\n\n${response}` });
+      await msg.reply(`*Meme*\n\n${response}`);
     } catch (e) {
-      await sock.sendMessage(jid, { text: `Meme Error: ${e.message}` });
+      await msg.reply(`Meme Error: ${e.message}`);
     }
   },
 
   // ── .emoji <text> ─────────────────────────────────────────────────────
   async emoji(sock, msg, args) {
-    const jid = msg.key.remoteJid;
-    if (!args.length) return sock.sendMessage(jid, { text: 'Usage: .emoji <text>\nExample: .emoji I love music' });
+    if (!args.length) return msg.reply('Usage: .emoji <text>\nExample: .emoji I love music');
     try {
       const response = await pollinations.textGenerate([
         { role: 'system', content: 'Convert the given text into a fun, expressive emoji representation. Use emojis to tell the same story/meaning. Keep it recognizable but creative. Just output the emojis, no explanation.' },
         { role: 'user', content: `Convert to emojis: ${args.join(' ')}` },
       ]);
-      await sock.sendMessage(jid, { text: `*Emoji Version*\n\nOriginal: ${args.join(' ')}\nEmoji: ${response}` });
+      await msg.reply(`*Emoji Version*\n\nOriginal: ${args.join(' ')}\nEmoji: ${response}`);
     } catch (e) {
-      await sock.sendMessage(jid, { text: `Error: ${e.message}` });
+      await msg.reply(`Error: ${e.message}`);
     }
   },
 
   // ── .insult <name> (playful only) ────────────────────────────────────
   async insult(sock, msg, args) {
-    const jid = msg.key.remoteJid;
     const target = args.join(' ') || 'the person reading this';
-    await sock.sendMessage(jid, { text: '_Loading playful insult..._' });
+    await msg.reply('_Loading playful insult..._');
     try {
       const response = await pollinations.textGenerate([
         { role: 'system', content: 'You write silly, playful, non-offensive insults meant for friends joking around. Keep it funny and light — no slurs or real meanness. 1-2 sentences.' },
         { role: 'user', content: `Playful insult for: ${target}` },
       ]);
-      await sock.sendMessage(jid, { text: `*Playful Insult*\n\n${response}` });
+      await msg.reply(`*Playful Insult*\n\n${response}`);
     } catch (e) {
-      await sock.sendMessage(jid, { text: `Error: ${e.message}` });
+      await msg.reply(`Error: ${e.message}`);
     }
   },
 
   // ── .quote ────────────────────────────────────────────────────────────
   async quote(sock, msg, args) {
-    const jid = msg.key.remoteJid;
     const topic = args.join(' ') || 'life';
-    await sock.sendMessage(jid, { text: '_Finding a quote..._' });
+    await msg.reply('_Finding a quote..._');
     try {
       const response = await pollinations.textGenerate([
         { role: 'system', content: 'You share famous inspirational quotes. Give the quote in _italic_ and *bold* the author name on a new line. Just the quote and author, nothing else.' },
         { role: 'user', content: `Give me a famous quote about: ${topic}` },
       ]);
-      await sock.sendMessage(jid, { text: response });
+      await msg.reply(response);
     } catch (e) {
-      await sock.sendMessage(jid, { text: `Error: ${e.message}` });
+      await msg.reply(`Error: ${e.message}`);
     }
   },
 };

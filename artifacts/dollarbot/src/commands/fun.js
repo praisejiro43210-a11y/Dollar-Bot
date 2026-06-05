@@ -119,103 +119,95 @@ function getBar(pct) {
 
 const funCommands = {
   async joke(sock, msg) {
-    await sock.sendMessage(msg.key.remoteJid, { text: `😂 *Joke Time!*\n\n${getRandom(jokes)}` });
+    await msg.reply(`😂 *Joke Time!*\n\n${getRandom(jokes)}`);
   },
 
   async dadjoke(sock, msg) {
-    await sock.sendMessage(msg.key.remoteJid, { text: `👨 *Dad Joke Alert!*\n\n${getRandom(dadjokes)}` });
+    await msg.reply(`👨 *Dad Joke Alert!*\n\n${getRandom(dadjokes)}`);
   },
 
   async fact(sock, msg) {
-    const jid = msg.key.remoteJid;
     try {
       const fact = await pollinations.textGenerate([{ role: 'system', content: 'You are an encyclopedia of fascinating, obscure, and mind-blowing facts. Output exactly one random, highly interesting fact. Do not use conversational filler, just the fact.' }]);
-      await sock.sendMessage(jid, { text: `🧠 *Random Fact!*\n\n${fact}` });
+      await msg.reply(`🧠 *Random Fact!*\n\n${fact}`);
     } catch (e) {
-      await sock.sendMessage(jid, { text: `❌ Fact Error: ${e.message}` });
+      await msg.reply(`❌ Fact Error: ${e.message}`);
     }
   },
 
   async advice(sock, msg) {
-    await sock.sendMessage(msg.key.remoteJid, { text: `💡 *Daily Advice*\n\n${getRandom(advices)}` });
+    await msg.reply(`💡 *Daily Advice*\n\n${getRandom(advices)}`);
   },
 
   async compliment(sock, msg) {
-    await sock.sendMessage(msg.key.remoteJid, { text: `💝 *Compliment for You!*\n\n${getRandom(compliments)}` });
+    await msg.reply(`💝 *Compliment for You!*\n\n${getRandom(compliments)}`);
   },
 
   async eightball(sock, msg, args) {
-    const jid = msg.key.remoteJid;
     if (!args.length) {
-      return sock.sendMessage(jid, { text: '🎱 Usage: .8ball <your question>' });
+      return msg.reply('🎱 Usage: .8ball <your question>');
     }
     const question = args.join(' ');
     const answer = getRandom(eightBallResponses);
-    await sock.sendMessage(jid, { text: `🎱 *Magic 8-Ball*\n\n❓ ${question}\n\n${answer}` });
+    await msg.reply(`🎱 *Magic 8-Ball*\n\n❓ ${question}\n\n${answer}`);
   },
 
   async truth(sock, msg) {
-    await sock.sendMessage(msg.key.remoteJid, { text: `😮 *Truth!*\n\n${getRandom(truths)}` });
+    await msg.reply(`😮 *Truth!*\n\n${getRandom(truths)}`);
   },
 
   async dare(sock, msg) {
-    await sock.sendMessage(msg.key.remoteJid, { text: `😈 *Dare!*\n\n${getRandom(dares)}` });
+    await msg.reply(`😈 *Dare!*\n\n${getRandom(dares)}`);
   },
 
   async reverse(sock, msg, args) {
-    const jid = msg.key.remoteJid;
     if (!args.length) {
-      return sock.sendMessage(jid, { text: '❌ Usage: .reverse <text>' });
+      return msg.reply('❌ Usage: .reverse <text>');
     }
     const reversed = args.join(' ').split('').reverse().join('');
-    await sock.sendMessage(jid, { text: `🔄 *Reversed:*\n\n${reversed}` });
+    await msg.reply(`🔄 *Reversed:*\n\n${reversed}`);
   },
 
   async hotcheck(sock, msg, args) {
-    const jid = msg.key.remoteJid;
     const name = args.join(' ') || msg.pushName || 'You';
     const pct = getPercent(name + 'hot');
-    await sock.sendMessage(jid, {
-      text: `🔥 *Hot Check for ${name}*\n\n${getBar(pct)} ${pct}%\n\n${pct >= 80 ? 'Absolutely smoking!' : pct >= 60 ? 'Pretty hot!' : pct >= 40 ? 'Decent!' : 'Needs warming up!'}`,
-    });
+    await msg.reply(
+      `🔥 *Hot Check for ${name}*\n\n${getBar(pct)} ${pct}%\n\n${pct >= 80 ? 'Absolutely smoking!' : pct >= 60 ? 'Pretty hot!' : pct >= 40 ? 'Decent!' : 'Needs warming up!'}`
+    );
   },
 
   async smartcheck(sock, msg, args) {
-    const jid = msg.key.remoteJid;
     const name = args.join(' ') || msg.pushName || 'You';
     const pct = getPercent(name + 'smart');
-    await sock.sendMessage(jid, {
-      text: `🧠 *Smart Check for ${name}*\n\n${getBar(pct)} ${pct}%\n\n${pct >= 80 ? 'Genius level!' : pct >= 60 ? 'Quite intelligent!' : pct >= 40 ? 'Average smart!' : 'Room for growth!'}`,
-    });
+    await msg.reply(
+      `🧠 *Smart Check for ${name}*\n\n${getBar(pct)} ${pct}%\n\n${pct >= 80 ? 'Genius level!' : pct >= 60 ? 'Quite intelligent!' : pct >= 40 ? 'Average smart!' : 'Room for growth!'}`
+    );
   },
 
   async brainlevel(sock, msg, args) {
-    const jid = msg.key.remoteJid;
     const name = args.join(' ') || msg.pushName || 'You';
     const pct = getPercent(name + 'brain');
     const levels = ['🥚 Egg Brain', '🐣 Hatching', '🐥 Baby Brain', '😐 Average', '🤔 Thinker', '📖 Scholar', '🔬 Intellectual', '🧬 Genius', '🚀 Mastermind', '🌌 Galaxy Brain'];
     const level = levels[Math.floor(pct / 10)];
-    await sock.sendMessage(jid, {
-      text: `🧠 *Brain Level for ${name}*\n\n${getBar(pct)} ${pct}%\n\n🏆 Level: ${level}`,
-    });
+    await msg.reply(
+      `🧠 *Brain Level for ${name}*\n\n${getBar(pct)} ${pct}%\n\n🏆 Level: ${level}`
+    );
   },
 
   async coolcheck(sock, msg, args) {
-    const jid = msg.key.remoteJid;
     const name = args.join(' ') || msg.pushName || 'You';
     const pct = getPercent(name + 'cool');
-    await sock.sendMessage(jid, {
-      text: `😎 *Cool Check for ${name}*\n\n${getBar(pct)} ${pct}%\n\n${pct >= 80 ? 'Ice cold, too cool for school!' : pct >= 60 ? 'Pretty cool dude!' : pct >= 40 ? 'Sorta cool!' : 'Needs a vibe upgrade!'}`,
-    });
+    await msg.reply(
+      `😎 *Cool Check for ${name}*\n\n${getBar(pct)} ${pct}%\n\n${pct >= 80 ? 'Ice cold, too cool for school!' : pct >= 60 ? 'Pretty cool dude!' : pct >= 40 ? 'Sorta cool!' : 'Needs a vibe upgrade!'}`
+    );
   },
 
   async lovecheck(sock, msg, args) {
-    const jid = msg.key.remoteJid;
     const name = args.join(' ') || msg.pushName || 'You';
     const pct = getPercent(name + 'love');
-    await sock.sendMessage(jid, {
-      text: `❤️ *Love Check for ${name}*\n\n${getBar(pct)} ${pct}%\n\n${pct >= 80 ? 'Overflowing with love!' : pct >= 60 ? 'Very loveable!' : pct >= 40 ? 'Warmhearted!' : 'Needs to open up!'}`,
-    });
+    await msg.reply(
+      `❤️ *Love Check for ${name}*\n\n${getBar(pct)} ${pct}%\n\n${pct >= 80 ? 'Overflowing with love!' : pct >= 60 ? 'Very loveable!' : pct >= 40 ? 'Warmhearted!' : 'Needs to open up!'}`
+    );
   },
 };
 

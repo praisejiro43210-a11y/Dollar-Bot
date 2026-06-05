@@ -19,6 +19,7 @@ const toolsCommands   = require('./commands/tools');
 const apiCommands     = require('./commands/api');
 const mediaCommands   = require('./commands/media');
 const devCommands     = require('./commands/dev');
+const { extractBody, getMentionedJids } = require('./lib/messages');
 
 const LINK_RE = /(?:https?:\/\/|www\.|chat\.whatsapp\.com\/)[^\s]+/gi;
 
@@ -26,23 +27,6 @@ const LINK_RE = /(?:https?:\/\/|www\.|chat\.whatsapp\.com\/)[^\s]+/gi;
 let menuImageIndex = 0;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-
-function extractBody(msg) {
-  // Cache result to avoid re-extraction
-  if (msg._cachedBody !== undefined) return msg._cachedBody;
-  
-  const body =
-    msg.message?.conversation ||
-    msg.message?.extendedTextMessage?.text ||
-    msg.message?.imageMessage?.caption ||
-    msg.message?.videoMessage?.caption ||
-    msg.message?.buttonsResponseMessage?.selectedButtonId ||
-    msg.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
-    '';
-  
-  msg._cachedBody = body;
-  return body;
-}
 
 function extractSender(msg, isGroup) {
   if (isGroup) {
@@ -106,8 +90,54 @@ function getRamInfo() {
   return { pct, bar, usedGB, totalGB };
 }
 
+// ── Safe sender (fixes WhatsApp “not-acceptable” payload errors) ─────────
+async function safeSendMessage(sock, jid, payload, msgObj = null) {
+  try {
+    // If msgObj is provided (message object for quoting), use quoted sending in groups
+    if (msgObj && jid.endsWith('@g.us')) {
+      return await sock.sendMessage(jid, payload, { quoted: msgObj });
+    }
+    return await sock.sendMessage(jid, payload);
+  } catch (err) {
+    const msg = err?.message || String(err);
+    if (!/not-acceptable/i.test(msg)) throw err;
+
+    // Retry with sanitized payload: remove mentions + fall back to text/caption-only.
+    try {
+      const sanitized = { ...payload };
+      if (sanitized.mentions) delete sanitized.mentions;
+
+      // If media payload is present, WhatsApp may reject the full payload in groups.
+      if (sanitized.image || sanitized.video || sanitized.document || sanitized.sticker) {
+        const text = sanitized.caption ?? sanitized.text ?? '';
+        if (msgObj && jid.endsWith('@g.us')) {
+          return await sock.sendMessage(jid, { text }, { quoted: msgObj });
+        }
+        return await sock.sendMessage(jid, { text });
+      }
+
+      // Default: send only text (avoid unknown/invalid keys)
+      const text = sanitized.text ?? '';
+      if (payload.text || payload.caption || text) {
+        if (msgObj && jid.endsWith('@g.us')) {
+          return await sock.sendMessage(jid, { text: payload.text ?? payload.caption ?? '' }, { quoted: msgObj });
+        }
+        return await sock.sendMessage(jid, { text: payload.text ?? payload.caption ?? '' });
+      }
+
+      if (msgObj && jid.endsWith('@g.us')) {
+        return await sock.sendMessage(jid, { text: ' ' }, { quoted: msgObj });
+      }
+      return await sock.sendMessage(jid, { text: ' ' });
+    } catch (err2) {
+      throw err2;
+    }
+  }
+}
+
 // ── Rotating menu sender ───────────────────────────────────────────────────
 async function sendMenu(sock, jid, speedMs) {
+
   const ram = getRamInfo();
   const uptime = getUptime();
   const autoReply = (await store.get('autoreply')) ? 'ON' : 'OFF';
@@ -278,7 +308,8 @@ async function sendMenu(sock, jid, speedMs) {
   try {
     if (fs.existsSync(imgPath)) {
       const img = fs.readFileSync(imgPath);
-      const sendPromise = sock.sendMessage(jid, { image: img, caption });
+      const sendPromise = safeSendMessage(sock, jid, { image: img, caption });
+
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Media timeout')), 8000)
       );
@@ -288,11 +319,13 @@ async function sendMenu(sock, jid, speedMs) {
   } catch (err) {
     console.log('[Menu] Image send failed, falling back to text:', err.message);
   }
-  await sock.sendMessage(jid, { text: caption });
+  await safeSendMessage(sock, jid, { text: caption });
 }
 
+
 function ownerOnly(sock, jid) {
-  return sock.sendMessage(jid, { text: 'This command is restricted to the bot owner.' });
+  // Use safeSendMessage to avoid WhatsApp group payload rejections.
+  return safeSendMessage(sock, jid, { text: 'This command is restricted to the bot owner.' });
 }
 
 // ── Main message handler ────────────────────────────────────────────────────
@@ -319,7 +352,8 @@ async function handleMessage(sock, msg) {
     const isGroup = jid.endsWith('@g.us');
     const sender  = extractSender(msg, isGroup);
     const isOwner = isOwnerJid(sender);
-    const body    = extractBody(msg);
+    const bodyRaw = extractBody(msg);
+    const body = bodyRaw?.trim();
     if (!body) return;
 
     const isCmd = body.startsWith(config.prefix);
@@ -476,47 +510,47 @@ async function handleMessage(sock, msg) {
 
       // ── Group ────────────────────────────────────────────────────────────
       case 'kick': {
-        if (!await getIsSenderAdmin()) return sock.sendMessage(jid, { text: '❌ This command is restricted to group admins and the bot owner.' });
+        if (!await getIsSenderAdmin()) return msg.reply('❌ This command is restricted to group admins and the bot owner.');
         await groupCommands.kick(sock, msg, args, await getIsAdmin());
         break;
       }
       case 'promote': {
-        if (!await getIsSenderAdmin()) return sock.sendMessage(jid, { text: '❌ This command is restricted to group admins and the bot owner.' });
+        if (!await getIsSenderAdmin()) return msg.reply('❌ This command is restricted to group admins and the bot owner.');
         await groupCommands.promote(sock, msg, args, await getIsAdmin());
         break;
       }
       case 'demote': {
-        if (!await getIsSenderAdmin()) return sock.sendMessage(jid, { text: '❌ This command is restricted to group admins and the bot owner.' });
+        if (!await getIsSenderAdmin()) return msg.reply('❌ This command is restricted to group admins and the bot owner.');
         await groupCommands.demote(sock, msg, args, await getIsAdmin());
         break;
       }
       case 'mute': {
-        if (!await getIsSenderAdmin()) return sock.sendMessage(jid, { text: '❌ This command is restricted to group admins and the bot owner.' });
+        if (!await getIsSenderAdmin()) return msg.reply('❌ This command is restricted to group admins and the bot owner.');
         await groupCommands.mute(sock, msg, await getIsAdmin());
         break;
       }
       case 'unmute': {
-        if (!await getIsSenderAdmin()) return sock.sendMessage(jid, { text: '❌ This command is restricted to group admins and the bot owner.' });
+        if (!await getIsSenderAdmin()) return msg.reply('❌ This command is restricted to group admins and the bot owner.');
         await groupCommands.unmute(sock, msg, await getIsAdmin());
         break;
       }
       case 'tagall': {
-        if (!await getIsSenderAdmin()) return sock.sendMessage(jid, { text: '❌ This command is restricted to group admins and the bot owner.' });
+        if (!await getIsSenderAdmin()) return msg.reply('❌ This command is restricted to group admins and the bot owner.');
         await groupCommands.tagall(sock, msg);
         break;
       }
       case 'everyone': {
-        if (!await getIsSenderAdmin()) return sock.sendMessage(jid, { text: '❌ This command is restricted to group admins and the bot owner.' });
+        if (!await getIsSenderAdmin()) return msg.reply('❌ This command is restricted to group admins and the bot owner.');
         await groupCommands.everyone(sock, msg, args);
         break;
       }
       case 'hidetag': {
-        if (!await getIsSenderAdmin()) return sock.sendMessage(jid, { text: '❌ This command is restricted to group admins and the bot owner.' });
+        if (!await getIsSenderAdmin()) return msg.reply('❌ This command is restricted to group admins and the bot owner.');
         await groupCommands.hidetag(sock, msg, args);
         break;
       }
       case 'grouplink': {
-        if (!await getIsSenderAdmin()) return sock.sendMessage(jid, { text: '❌ This command is restricted to group admins and the bot owner.' });
+        if (!await getIsSenderAdmin()) return msg.reply('❌ This command is restricted to group admins and the bot owner.');
         await groupCommands.grouplink(sock, msg, await getIsAdmin());
         break;
       }
@@ -525,12 +559,12 @@ async function handleMessage(sock, msg) {
         break;
       }
       case 'antilink': {
-        if (!await getIsSenderAdmin()) return sock.sendMessage(jid, { text: '❌ This command is restricted to group admins and the bot owner.' });
+        if (!await getIsSenderAdmin()) return msg.reply('❌ This command is restricted to group admins and the bot owner.');
         await groupCommands.antilink(sock, msg, args);
         break;
       }
       case 'welcome': {
-        if (!await getIsSenderAdmin()) return sock.sendMessage(jid, { text: '❌ This command is restricted to group admins and the bot owner.' });
+        if (!await getIsSenderAdmin()) return msg.reply('❌ This command is restricted to group admins and the bot owner.');
         await groupCommands.welcome(sock, msg, args);
         break;
       }
@@ -611,6 +645,9 @@ async function handleMessage(sock, msg) {
 
 async function handleNonCommand(sock, msg, body, jid, sender, isGroup, isOwner) {
   try {
+    // Strict: never auto-reply in group chats (even if mentioned)
+    if (isGroup) return;
+
     // ── Active math game check ─────────────────────────────────────────
     const mathDone = await gameCommands.checkMathAnswer(sock, msg, body);
     if (mathDone) return;
@@ -631,10 +668,11 @@ async function handleNonCommand(sock, msg, body, jid, sender, isGroup, isOwner) 
       const antilinkGroups = (await store.get('antilinkGroups')) || {};
       if (antilinkGroups[jid] && LINK_RE.test(body)) {
         try { await sock.sendMessage(jid, { delete: msg.key }); } catch (_) {}
-        await sock.sendMessage(jid, {
+        await safeSendMessage(sock, jid, {
           text: `@${sender?.split('@')[0]} links are not allowed in this group.`,
           mentions: [sender],
         });
+
         return;
       }
     }
@@ -648,9 +686,7 @@ async function handleNonCommand(sock, msg, body, jid, sender, isGroup, isOwner) 
       // Check if bot is mentioned — WhatsApp mentions in two ways:
       // 1. @number in message body text
       // 2. JID in contextInfo.mentionedJid array
-      const mentionedJids =
-        msg.message?.extendedTextMessage?.contextInfo?.mentionedJid ||
-        msg.message?.imageMessage?.contextInfo?.mentionedJid || [];
+      const mentionedJids = getMentionedJids(msg);
 
       const isMentionedInJids = mentionedJids.some(j => {
         const bare = j.split(':')[0].split('@')[0];
@@ -671,7 +707,7 @@ async function handleNonCommand(sock, msg, body, jid, sender, isGroup, isOwner) 
             .replace(/@\d+/g, '')
             .trim() || 'Hello';
           const aiResponse = await autoReplyAI(jid, cleanBody);
-          await sock.sendMessage(jid, { text: aiResponse });
+          await safeSendMessage(sock, jid, { text: aiResponse });
         } catch (err) {
           console.log('[AutoReply Error]', err.message);
         }

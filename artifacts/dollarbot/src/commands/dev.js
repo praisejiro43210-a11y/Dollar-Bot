@@ -4,20 +4,18 @@ const { v4: uuidv4 } = require('uuid');
 const devCommands = {
   // ── JSON Minify ─────────────────────────────────────────────────────────
   async jsonminify(sock, msg, args) {
-    const jid = msg.key.remoteJid;
-    if (!args.length) return sock.sendMessage(jid, { text: '❌ Usage: .jsonminify <json>' });
+    if (!args.length) return msg.reply('❌ Usage: .jsonminify <json>');
     try {
       const json = JSON.parse(args.join(' '));
       const minified = JSON.stringify(json);
-      await sock.sendMessage(jid, { text: `\`\`\`\n${minified}\`\`\`` });
+      await msg.reply(`\`\`\`\n${minified}\`\`\``);
     } catch (e) {
-      await sock.sendMessage(jid, { text: `❌ Invalid JSON: ${e.message}` });
+      await msg.reply(`❌ Invalid JSON: ${e.message}`);
     }
   },
 
   // ── Timestamp Converter ──────────────────────────────────────────────────
   async timestamp(sock, msg, args) {
-    const jid = msg.key.remoteJid;
     let date;
     if (!args.length) {
       date = new Date();
@@ -29,105 +27,87 @@ const devCommands = {
       date = new Date(args.join(' '));
     }
     
-    if (isNaN(date)) return sock.sendMessage(jid, { text: '❌ Invalid date' });
+    if (isNaN(date)) return msg.reply('❌ Invalid date');
     
-    await sock.sendMessage(jid, {
-      text: `*⏰ Timestamp Converter*\n\n` +
-            `📅 Date: ${date.toISOString()}\n` +
-            `⏱️ Unix: ${Math.floor(date.getTime() / 1000)}\n` +
-            `📊 Milliseconds: ${date.getTime()}`
-    });
+    await msg.reply(`*⏰ Timestamp Converter*\n\n` +
+          `📅 Date: ${date.toISOString()}\n` +
+          `⏱️ Unix: ${Math.floor(date.getTime() / 1000)}\n` +
+          `📊 Milliseconds: ${date.getTime()}`);
   },
 
   // ── Base32 Encoder/Decoder ──────────────────────────────────────────────
   async base32(sock, msg, args) {
-    const jid = msg.key.remoteJid;
-    if (!args.length) return sock.sendMessage(jid, { text: '❌ Usage: .base32 <text>' });
+    if (!args.length) return msg.reply('❌ Usage: .base32 <text>');
     try {
       const text = args.join(' ');
       const encoded = Buffer.from(text).toString('base64');
       const decoded = Buffer.from(encoded, 'base64').toString();
-      await sock.sendMessage(jid, {
-        text: `*📝 Base32 Conversion*\n\n` +
-              `Original: ${text}\n` +
-              `Encoded: \`${encoded}\``
-      });
+      await msg.reply(`*📝 Base32 Conversion*\n\n` +
+            `Original: ${text}\n` +
+            `Encoded: \`${encoded}\``);
     } catch (e) {
-      await sock.sendMessage(jid, { text: `❌ Base32 Error: ${e.message}` });
+      await msg.reply(`❌ Base32 Error: ${e.message}`);
     }
   },
 
   // ── JWT Decoder ─────────────────────────────────────────────────────────
   async jwtdecode(sock, msg, args) {
-    const jid = msg.key.remoteJid;
-    if (!args.length) return sock.sendMessage(jid, { text: '❌ Usage: .jwtdecode <token>' });
+    if (!args.length) return msg.reply('❌ Usage: .jwtdecode <token>');
     try {
       const parts = args[0].split('.');
-      if (parts.length !== 3) return sock.sendMessage(jid, { text: '❌ Invalid JWT format' });
+      if (parts.length !== 3) return msg.reply('❌ Invalid JWT format');
       
       const header = JSON.parse(Buffer.from(parts[0], 'base64').toString());
       const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
       
-      await sock.sendMessage(jid, {
-        text: `*🔐 JWT Decoded*\n\n` +
-              `Header: \`${JSON.stringify(header)}\`\n\n` +
-              `Payload: \`${JSON.stringify(payload)}\``
-      });
+      await msg.reply(`*🔐 JWT Decoded*\n\n` +
+            `Header: \`${JSON.stringify(header)}\`\n\n` +
+            `Payload: \`${JSON.stringify(payload)}\``);
     } catch (e) {
-      await sock.sendMessage(jid, { text: `❌ JWT Error: ${e.message}` });
+      await msg.reply(`❌ JWT Error: ${e.message}`);
     }
   },
 
   // ── Regex Tester ────────────────────────────────────────────────────────
   async regextest(sock, msg, args) {
-    const jid = msg.key.remoteJid;
-    if (args.length < 2) return sock.sendMessage(jid, { text: '❌ Usage: .regextest <pattern> <text>' });
+    if (args.length < 2) return msg.reply('❌ Usage: .regextest <pattern> <text>');
     try {
       const pattern = args[0];
       const text = args.slice(1).join(' ');
       const regex = new RegExp(pattern);
       const matches = text.match(regex) || [];
       
-      await sock.sendMessage(jid, {
-        text: `*🔍 Regex Test*\n\n` +
-              `Pattern: ${pattern}\n` +
-              `Text: ${text}\n` +
-              `Matches: ${matches.length}\n` +
-              `Result: ${matches.length > 0 ? '✅ Match found!' : '❌ No match'}`
-      });
+      await msg.reply(`*🔍 Regex Test*\n\n` +
+            `Pattern: ${pattern}\n` +
+            `Text: ${text}\n` +
+            `Matches: ${matches.length}\n` +
+            `Result: ${matches.length > 0 ? '✅ Match found!' : '❌ No match'}`);
     } catch (e) {
-      await sock.sendMessage(jid, { text: `❌ Regex Error: ${e.message}` });
+      await msg.reply(`❌ Regex Error: ${e.message}`);
     }
   },
 
   // ── URL Encoder/Decoder ─────────────────────────────────────────────────
   async urlencode(sock, msg, args) {
-    const jid = msg.key.remoteJid;
-    if (!args.length) return sock.sendMessage(jid, { text: '❌ Usage: .urlencode <text>' });
+    if (!args.length) return msg.reply('❌ Usage: .urlencode <text>');
     const text = args.join(' ');
     const encoded = encodeURIComponent(text);
     const decoded = decodeURIComponent(encoded);
-    await sock.sendMessage(jid, {
-      text: `*🔗 URL Encoding*\n\n` +
-            `Original: ${text}\n` +
-            `Encoded: \`${encoded}\`\n` +
-            `Decoded: \`${decoded}\``
-    });
+    await msg.reply(`*🔗 URL Encoding*\n\n` +
+          `Original: ${text}\n` +
+          `Encoded: \`${encoded}\`\n` +
+          `Decoded: \`${decoded}\``);
   },
 
   // ── UUID v4 Generator ────────────────────────────────────────────────────
   async uuidgen(sock, msg) {
-    const jid = msg.key.remoteJid;
     const uuids = [uuidv4(), uuidv4(), uuidv4(), uuidv4(), uuidv4()];
-    await sock.sendMessage(jid, {
-      text: `*🆔 UUID v4 Generated*\n\n${uuids.map((u, i) => `${i + 1}. \`${u}\``).join('\n')}`
-    });
+    await msg.reply(`*🆔 UUID v4 Generated*\n\n${uuids.map((u, i) => `${i + 1}. \`${u}\``).join('\n')}`);
   },
 
   // ── HTTP Status Checker ─────────────────────────────────────────────────
   async httpstatus(sock, msg, args) {
-    const jid = msg.key.remoteJid;
-    if (!args.length) return sock.sendMessage(jid, { text: '❌ Usage: .httpstatus <code>' });
+    if (!args.length) return msg.reply('❌ Usage: .httpstatus <code>');
     const codes = {
       '200': '✅ OK',
       '201': '✅ Created',
@@ -144,13 +124,12 @@ const devCommands = {
       '503': '💥 Service Unavailable',
     };
     const status = codes[args[0]] || '❓ Unknown Status Code';
-    await sock.sendMessage(jid, { text: `*📊 HTTP ${args[0]}*\n\n${status}` });
+    await msg.reply(`*📊 HTTP ${args[0]}*\n\n${status}`);
   },
 
   // ── MIME Type Lookup ────────────────────────────────────────────────────
   async mime(sock, msg, args) {
-    const jid = msg.key.remoteJid;
-    if (!args.length) return sock.sendMessage(jid, { text: '❌ Usage: .mime <extension>' });
+    if (!args.length) return msg.reply('❌ Usage: .mime <extension>');
     const mimes = {
       'js': 'application/javascript',
       'json': 'application/json',
@@ -168,12 +147,11 @@ const devCommands = {
     };
     const ext = args[0].toLowerCase();
     const mime = mimes[ext] || '❌ Unknown extension';
-    await sock.sendMessage(jid, { text: `*${ext.toUpperCase()} MIME Type*\n\n${mime}` });
+    await msg.reply(`*${ext.toUpperCase()} MIME Type*\n\n${mime}`);
   },
 
   // ── Code Syntax Highlighter Info ────────────────────────────────────────
   async langinfo(sock, msg, args) {
-    const jid = msg.key.remoteJid;
     const langs = {
       'js': '📱 JavaScript',
       'python': '🐍 Python',
@@ -188,59 +166,49 @@ const devCommands = {
     };
     const lang = args[0]?.toLowerCase();
     if (!lang || !langs[lang]) {
-      return sock.sendMessage(jid, { 
-        text: `*📚 Available Languages*\n\n${Object.entries(langs).map(([k, v]) => `${k} → ${v}`).join('\n')}` 
-      });
+      return msg.reply(`*📚 Available Languages*\n\n${Object.entries(langs).map(([k, v]) => `${k} → ${v}`).join('\n')}`);
     }
-    await sock.sendMessage(jid, { text: `*${langs[lang]}*\n\nPopular programming language` });
+    await msg.reply(`*${langs[lang]}*\n\nPopular programming language`);
   },
 
   // ── Random Port Generator ────────────────────────────────────────────────
   async randomport(sock, msg) {
-    const jid = msg.key.remoteJid;
     const ports = [];
     for (let i = 0; i < 5; i++) {
       ports.push(Math.floor(Math.random() * (65535 - 1024 + 1)) + 1024);
     }
-    await sock.sendMessage(jid, {
-      text: `*🔌 Random Ports*\n\n${ports.map((p, i) => `${i + 1}. ${p}`).join('\n')}`
-    });
+    await msg.reply(`*🔌 Random Ports*\n\n${ports.map((p, i) => `${i + 1}. ${p}`).join('\n')}`);
   },
 
   // ── NPM Package Info ────────────────────────────────────────────────────
   async npmpkg(sock, msg, args) {
-    const jid = msg.key.remoteJid;
-    if (!args.length) return sock.sendMessage(jid, { text: '❌ Usage: .npmpkg <package_name>' });
+    if (!args.length) return msg.reply('❌ Usage: .npmpkg <package_name>');
     try {
       const pkg = args[0];
       const res = await axios.get(`https://registry.npmjs.org/${pkg}`);
-      await sock.sendMessage(jid, {
-        text: `*📦 NPM Package: ${res.data.name}*\n\n` +
-              `🔖 Latest: ${res.data['dist-tags'].latest}\n` +
-              `📮 Downloads: ${res.data.description?.substring(0, 50)}\n` +
-              `🔗 ${res.data.homepage || res.data.repository?.url || 'No URL'}`
-      });
+      await msg.reply(`*📦 NPM Package: ${res.data.name}*\n\n` +
+            `🔖 Latest: ${res.data['dist-tags'].latest}\n` +
+            `📮 Downloads: ${res.data.description?.substring(0, 50)}\n` +
+            `🔗 ${res.data.homepage || res.data.repository?.url || 'No URL'}`);
     } catch (e) {
-      await sock.sendMessage(jid, { text: `❌ NPM Error: ${e.message}` });
+      await msg.reply(`❌ NPM Error: ${e.message}`);
     }
   },
 
   // ── Markdown to HTML Preview ────────────────────────────────────────────
   async mdpreview(sock, msg, args) {
-    const jid = msg.key.remoteJid;
-    if (!args.length) return sock.sendMessage(jid, { text: '❌ Usage: .mdpreview <markdown>' });
+    if (!args.length) return msg.reply('❌ Usage: .mdpreview <markdown>');
     const md = args.join(' ');
     // Simple markdown preview
     const preview = md
       .replace(/^# (.*)/gm, '<h1>$1</h1>')
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/_(.+?)_/g, '<em>$1</em>');
-    await sock.sendMessage(jid, { text: `*📝 Markdown Preview*\n\n${preview}` });
+    await msg.reply(`*📝 Markdown Preview*\n\n${preview}`);
   },
 
   // ── Git Commit Message Generator ────────────────────────────────────────
   async gitcommit(sock, msg, args) {
-    const jid = msg.key.remoteJid;
     const types = ['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'chore'];
     const type = types[Math.floor(Math.random() * types.length)];
     const scopes = ['api', 'ui', 'auth', 'db', 'core', 'utils'];
@@ -249,7 +217,7 @@ const devCommands = {
     const msg_text = messages[Math.floor(Math.random() * messages.length)];
     
     const commit = `${type}(${scope}): ${msg_text}`;
-    await sock.sendMessage(jid, { text: `*📝 Git Commit*\n\n\`${commit}\`` });
+    await msg.reply(`*📝 Git Commit*\n\n\`${commit}\``);
   },
 };
 

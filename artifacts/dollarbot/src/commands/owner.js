@@ -1,16 +1,10 @@
 const config = require('../config');
 const store = require('../lib/store');
+const { getContextInfo } = require('../lib/messages');
 
 // Helper: extract quoted message context
 function getQuoted(msg) {
-  return (
-    msg.message?.extendedTextMessage?.contextInfo ||
-    msg.message?.imageMessage?.contextInfo ||
-    msg.message?.videoMessage?.contextInfo ||
-    msg.message?.audioMessage?.contextInfo ||
-    msg.message?.stickerMessage?.contextInfo ||
-    null
-  );
+  return getContextInfo(msg);
 }
 
 const ownerCommands = {

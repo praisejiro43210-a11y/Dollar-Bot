@@ -4,7 +4,7 @@ const memory = require('./memory');
 
 // Groq API keys rotation
 const groqKeys = [
-  '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', // Ejiro (api2)
+  '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', // Ejiro (api2)
   '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'  // Blessing (api3)
 ];
 let currentKeyIndex = 0;

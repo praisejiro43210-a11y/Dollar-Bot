@@ -4,115 +4,112 @@ const memory = require('../lib/memory');
 const aiCommands = {
   async cortex(sock, msg, args, jid) {
     if (!args.length) {
-      return sock.sendMessage(jid, {
-        text:
-          `╭━━━〔 🧠 CORTEX AI 〕━━━⬣\n` +
-          `┃ Usage: .cortex <your question>\n` +
-          `┃\n` +
-          `┃ Expert-level AI with memory.\n` +
-          `┃ Adapts personality to any topic.\n` +
-          `┃ Ask anything — coding, science,\n` +
-          `┃ philosophy, creative writing & more.\n` +
-          `┃\n` +
-          `┃ 💡 It remembers your conversation!\n` +
-          `┃ Type .clear to reset memory.\n` +
-          `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
-          `Example: .cortex explain quantum entanglement`,
-      });
+      return msg.reply(
+        `╭━━━〔 🧠 CORTEX AI 〕━━━⬣\n` +
+        `┃ Usage: .cortex <your question>\n` +
+        `┃\n` +
+        `┃ Expert-level AI with memory.\n` +
+        `┃ Adapts personality to any topic.\n` +
+        `┃ Ask anything — coding, science,\n` +
+        `┃ philosophy, creative writing & more.\n` +
+        `┃\n` +
+        `┃ 💡 It remembers your conversation!\n` +
+        `┃ Type .clear to reset memory.\n` +
+        `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
+        `Example: .cortex explain quantum entanglement`
+      );
     }
-    await sock.sendMessage(jid, { text: '*Thinking...*' });
+    await msg.reply('*Thinking...*');
     try {
       const response = await pollinations.cortex(jid, args.join(' '));
-      await sock.sendMessage(jid, {
-        text: `╭━━━〔 CORTEX AI 〕━━━⬣\n\n${response}\n\n╰━━━━━━━━━━━━━━━━━━⬣\n\n⚡ Powered by Cortex AI`,
-      });
+      await msg.reply(
+        `╭━━━〔 CORTEX AI 〕━━━⬣\n\n${response}\n\n╰━━━━━━━━━━━━━━━━━━⬣\n\n⚡ Powered by Cortex AI`
+      );
     } catch (e) {
-      await sock.sendMessage(jid, { text: `Cortex Error: ${e.message}` });
+      await msg.reply(`Cortex Error: ${e.message}`);
     }
   },
 
   async mera(sock, msg, args, jid) {
     if (!args.length) {
-      return sock.sendMessage(jid, {
-        text:
-          `╭━━━〔 💖 MERA AI 〕━━━⬣\n` +
-          `┃ Usage: .mera <your message>\n` +
-          `┃\n` +
-          `┃ Friendly, warm female AI.\n` +
-          `┃ She remembers your chats!\n` +
-          `┃ Talk to her about anything.\n` +
-          `┃\n` +
-          `┃ 💡 Type .clear to reset memory.\n` +
-          `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
-          `Example: .mera how are you today?`,
-      });
+      return msg.reply(
+        `╭━━━〔 💖 MERA AI 〕━━━⬣\n` +
+        `┃ Usage: .mera <your message>\n` +
+        `┃\n` +
+        `┃ Friendly, warm female AI.\n` +
+        `┃ She remembers your chats!\n` +
+        `┃ Talk to her about anything.\n` +
+        `┃\n` +
+        `┃ 💡 Type .clear to reset memory.\n` +
+        `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
+        `Example: .mera how are you today?`
+      );
     }
-    await sock.sendMessage(jid, { text: '_Mera is typing..._' });
+    await msg.reply('_Mera is typing..._');
     try {
       const response = await pollinations.mera(jid, args.join(' '));
-      await sock.sendMessage(jid, {
-        text: `╭━━━〔 MERA AI 〕━━━⬣\n\n${response}\n\n╰━━━━━━━━━━━━━━━━━━⬣\n\n💖 Powered by Mera AI`,
-      });
+      await msg.reply(
+        `╭━━━〔 MERA AI 〕━━━⬣\n\n${response}\n\n╰━━━━━━━━━━━━━━━━━━⬣\n\n💖 Powered by Mera AI`
+      );
     } catch (e) {
-      await sock.sendMessage(jid, { text: `Error: ${e.message}` });
+      await msg.reply(`Error: ${e.message}`);
     }
   },
 
   async codeai(sock, msg, args, jid) {
     if (!args.length) {
-      return sock.sendMessage(jid, {
-        text:
-          `╭━━━〔 💻 CODE AI 〕━━━⬣\n` +
-          `┃ Usage: .codeai <question>\n` +
-          `┃\n` +
-          `┃ Expert coding AI. Supports all\n` +
-          `┃ languages — Python, JS, Rust,\n` +
-          `┃ Go, C++, SQL and more.\n` +
-          `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
-          `Example: .codeai write a REST API in Node.js`,
-      });
+      return msg.reply(
+        `╭━━━〔 💻 CODE AI 〕━━━⬣\n` +
+        `┃ Usage: .codeai <question>\n` +
+        `┃\n` +
+        `┃ Expert coding AI. Supports all\n` +
+        `┃ languages — Python, JS, Rust,\n` +
+        `┃ Go, C++, SQL and more.\n` +
+        `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
+        `Example: .codeai write a REST API in Node.js`
+      );
     }
-    await sock.sendMessage(jid, { text: '_CodeAI is generating..._' });
+    await msg.reply('_CodeAI is generating..._');
     try {
       const response = await pollinations.codeAI(args.join(' '));
-      await sock.sendMessage(jid, {
-        text: `╭━━━〔 CODE AI 〕━━━⬣\n\n${response}\n\n╰━━━━━━━━━━━━━━━━━━⬣\n\n⚡ Powered by CodeAI`,
-      });
+      await msg.reply(
+        `╭━━━〔 CODE AI 〕━━━⬣\n\n${response}\n\n╰━━━━━━━━━━━━━━━━━━⬣\n\n⚡ Powered by CodeAI`
+      );
     } catch (e) {
-      await sock.sendMessage(jid, { text: `CodeAI Error: ${e.message}` });
+      await msg.reply(`CodeAI Error: ${e.message}`);
     }
   },
 
   async roast(sock, msg, args, jid) {
-    if (!args.length) return sock.sendMessage(jid, { text: 'Usage: .roast <name>' });
-    await sock.sendMessage(jid, { text: '_Roasting..._' });
+    if (!args.length) return msg.reply('Usage: .roast <name>');
+    await msg.reply('_Roasting..._');
     try {
       const response = await pollinations.roast(args.join(' '));
-      await sock.sendMessage(jid, { text: `🔥 *ROAST TIME!*\n\n${response}` });
+      await msg.reply(`🔥 *ROAST TIME!*\n\n${response}`);
     } catch (e) {
-      await sock.sendMessage(jid, { text: `Error: ${e.message}` });
+      await msg.reply(`Error: ${e.message}`);
     }
   },
 
   async complimentai(sock, msg, args, jid) {
-    if (!args.length) return sock.sendMessage(jid, { text: 'Usage: .complimentai <name>' });
-    await sock.sendMessage(jid, { text: '_Creating compliment..._' });
+    if (!args.length) return msg.reply('Usage: .complimentai <name>');
+    await msg.reply('_Creating compliment..._');
     try {
       const response = await pollinations.complimentAI(args.join(' '));
-      await sock.sendMessage(jid, { text: `*Compliment*\n\n${response}` });
+      await msg.reply(`*Compliment*\n\n${response}`);
     } catch (e) {
-      await sock.sendMessage(jid, { text: `Error: ${e.message}` });
+      await msg.reply(`Error: ${e.message}`);
     }
   },
 
   async weather(sock, msg, args, jid) {
-    if (!args.length) return sock.sendMessage(jid, { text: 'Usage: .weather <city>\nExample: .weather Toronto' });
-    await sock.sendMessage(jid, { text: '_Fetching weather..._' });
+    if (!args.length) return msg.reply('Usage: .weather <city>\nExample: .weather Toronto');
+    await msg.reply('_Fetching weather..._');
     try {
       const result = await pollinations.getWeather(args.join(' '));
-      await sock.sendMessage(jid, { text: `*Weather*\n\n${result}\n\n_Powered by DollarBot_` });
+      await msg.reply(`*Weather*\n\n${result}\n\n_Powered by DollarBot_`);
     } catch (e) {
-      await sock.sendMessage(jid, { text: `Weather Error: ${e.message}` });
+      await msg.reply(`Weather Error: ${e.message}`);
     }
   },
 
@@ -147,79 +144,79 @@ const aiCommands = {
   },
 
   async translate(sock, msg, args, jid) {
-    if (!args.length) return sock.sendMessage(jid, { text: 'Usage: .translate <text>\nExample: .translate Hola como estas' });
-    await sock.sendMessage(jid, { text: '_Translating..._' });
+    if (!args.length) return msg.reply('Usage: .translate <text>\nExample: .translate Hola como estas');
+    await msg.reply('_Translating..._');
     try {
       const result = await pollinations.translate(args.join(' '));
-      await sock.sendMessage(jid, { text: `*Translation*\n\n${result}\n\n_Powered by DollarBot_` });
+      await msg.reply(`*Translation*\n\n${result}\n\n_Powered by DollarBot_`);
     } catch (e) {
-      await sock.sendMessage(jid, { text: `Translation Error: ${e.message}` });
+      await msg.reply(`Translation Error: ${e.message}`);
     }
   },
 
   async story(sock, msg, args, jid) {
-    if (!args.length) return sock.sendMessage(jid, { text: 'Usage: .story <topic>\nExample: .story a dragon who lost his fire' });
-    await sock.sendMessage(jid, { text: '_Writing your story..._' });
+    if (!args.length) return msg.reply('Usage: .story <topic>\nExample: .story a dragon who lost his fire');
+    await msg.reply('_Writing your story..._');
     try {
       const response = await pollinations.textGenerate([
         { role: 'system', content: 'You are a creative storyteller. Write a short engaging story (150-200 words). Use *bold* for character names and key moments. WhatsApp formatting only — no tables, no HTML.' },
         { role: 'user', content: `Write a short story about: ${args.join(' ')}` },
       ]);
-      await sock.sendMessage(jid, { text: `*Story*\n\n${response}\n\n_Powered by Dollar AI_` });
+      await msg.reply(`*Story*\n\n${response}\n\n_Powered by Dollar AI_`);
     } catch (e) {
-      await sock.sendMessage(jid, { text: `Error: ${e.message}` });
+      await msg.reply(`Error: ${e.message}`);
     }
   },
 
   async poem(sock, msg, args, jid) {
-    if (!args.length) return sock.sendMessage(jid, { text: 'Usage: .poem <topic>\nExample: .poem the ocean at night' });
-    await sock.sendMessage(jid, { text: '_Writing your poem..._' });
+    if (!args.length) return msg.reply('Usage: .poem <topic>\nExample: .poem the ocean at night');
+    await msg.reply('_Writing your poem..._');
     try {
       const response = await pollinations.textGenerate([
         { role: 'system', content: 'You are a poet. Write a short beautiful poem (4-8 lines). Use _italic_ for the title. WhatsApp formatting only — no tables, no HTML.' },
         { role: 'user', content: `Write a poem about: ${args.join(' ')}` },
       ]);
-      await sock.sendMessage(jid, { text: `*Poem*\n\n${response}\n\n_Powered by Dollar AI_` });
+      await msg.reply(`*Poem*\n\n${response}\n\n_Powered by Dollar AI_`);
     } catch (e) {
-      await sock.sendMessage(jid, { text: `Error: ${e.message}` });
+      await msg.reply(`Error: ${e.message}`);
     }
   },
 
   async motivate(sock, msg, args, jid) {
-    await sock.sendMessage(jid, { text: '_Finding motivation..._' });
+    await msg.reply('_Finding motivation..._');
     try {
       const response = await pollinations.textGenerate([
         { role: 'system', content: 'You are a motivational coach. Give one powerful genuine motivational message (2-4 sentences). Use *bold* for the key message. WhatsApp formatting only.' },
         { role: 'user', content: 'Give me a powerful motivational message.' },
       ]);
-      await sock.sendMessage(jid, { text: `*Daily Motivation*\n\n${response}` });
+      await msg.reply(`*Daily Motivation*\n\n${response}`);
     } catch (e) {
-      await sock.sendMessage(jid, { text: `Error: ${e.message}` });
+      await msg.reply(`Error: ${e.message}`);
     }
   },
 
   async summarize(sock, msg, args, jid) {
-    if (!args.length) return sock.sendMessage(jid, { text: 'Usage: .summarize <text>' });
-    await sock.sendMessage(jid, { text: '_Summarizing..._' });
+    if (!args.length) return msg.reply('Usage: .summarize <text>');
+    await msg.reply('_Summarizing..._');
     try {
       const response = await pollinations.textGenerate([
         { role: 'system', content: 'You are an expert summarizer. Provide a clear concise summary using bullet points (- item). Use *bold* for key points. WhatsApp formatting only — no tables, no HTML.' },
         { role: 'user', content: `Summarize this:\n${args.join(' ')}` },
       ]);
-      await sock.sendMessage(jid, { text: `*Summary*\n\n${response}\n\n_Powered by Dollar AI_` });
+      await msg.reply(`*Summary*\n\n${response}\n\n_Powered by Dollar AI_`);
     } catch (e) {
-      await sock.sendMessage(jid, { text: `Error: ${e.message}` });
+      await msg.reply(`Error: ${e.message}`);
     }
   },
 
   async clear(sock, msg, args, jid) {
     const persona = args[0]?.toLowerCase();
     if (persona && !['cortex', 'mera', 'autoreply'].includes(persona)) {
-      return sock.sendMessage(jid, { text: 'Usage: .clear [cortex/mera/autoreply]\nOmit to clear all AI memory.' });
+      return msg.reply('Usage: .clear [cortex/mera/autoreply]\nOmit to clear all AI memory.');
     }
     memory.clearHistory(jid, persona || null);
     const what = persona ? `*${persona}*` : '*all AI*';
-    await sock.sendMessage(jid, { text: `Memory cleared for ${what}. Fresh start!` });
+    await msg.reply(`Memory cleared for ${what}. Fresh start!`);
   },
 };
 
