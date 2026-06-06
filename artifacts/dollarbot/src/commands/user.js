@@ -25,17 +25,9 @@ function getRamInfo() {
 
 const userCommands = {
   async ping(sock, msg) {
-    const jid = msg.key.remoteJid;
     const start = Date.now();
-    const sent = await msg.reply('Pinging...');
     const ping = Date.now() - start;
     await msg.reply(`*Pong!*\nSpeed: *${ping}ms*`);
-
-    // Some Baileys wrappers don't expose a deletable message key from msg.reply().
-    // Only attempt delete if we have a usable key.
-    try {
-      if (sent?.key) await sock.sendMessage(jid, { delete: sent.key });
-    } catch (_) {}
   },
 
   async alive(sock, msg) {
@@ -184,4 +176,3 @@ const userCommands = {
 };
 
 module.exports = userCommands;
-

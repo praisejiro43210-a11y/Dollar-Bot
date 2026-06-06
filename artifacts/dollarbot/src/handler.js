@@ -23,6 +23,7 @@ const mediaCommands   = require('./commands/media');
 const devCommands     = require('./commands/dev');
 const moreFun         = require('./commands/morefun');
 const { bypassCommands, checkBypassIntercept } = require('./commands/bypass');
+const { safeSend } = require('./lib/safe-send');
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Message parsing — proper Baileys proto.IWebMessageInfo patterns
@@ -185,17 +186,8 @@ function getRamInfo() {
   };
 }
 
-/** Send a message, stripping unsupported fields if WhatsApp rejects it */
-async function safeSend(sock, jid, payload, quotedMsg = null) {
-  const opts = quotedMsg ? { quoted: quotedMsg } : {};
-  try {
-    return await sock.sendMessage(jid, payload, opts);
-  } catch (err) {
-    if (!/not-acceptable/i.test(err?.message || '')) throw err;
-    // Strip mentions / media and retry with plain text
-    const text = payload.caption ?? payload.text ?? '';
-    return await sock.sendMessage(jid, { text: text || ' ' }, opts);
-  }
+function replyOptions(quotedMsg) {
+  return quotedMsg ? { quoted: quotedMsg } : {};
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -396,13 +388,13 @@ async function sendMenu(sock, jid, speedMs, quotedMsg) {
   try {
     if (fs.existsSync(imgPath)) {
       await Promise.race([
-        safeSend(sock, jid, { image: fs.readFileSync(imgPath), caption }, quotedMsg),
+        safeSend(sock, jid, { image: fs.readFileSync(imgPath), caption }, replyOptions(quotedMsg)),
         new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 8000)),
       ]);
       return;
     }
   } catch (_) {}
-  await safeSend(sock, jid, { text: caption }, quotedMsg);
+  await safeSend(sock, jid, { text: caption }, replyOptions(quotedMsg));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -439,7 +431,7 @@ async function handleMessage(sock, msg) {
     // ── Attach helpers onto msg ─────────────────────────────────────────────
     //    msg.reply(text, options) — always quotes the triggering message
     msg.reply = (text, opts = {}) =>
-      safeSend(sock, jid, { text, ...opts }, msg);
+      safeSend(sock, jid, { text, ...opts }, replyOptions(msg));
 
     // ── Extract body ────────────────────────────────────────────────────────
     const body = (extractBody(msg) || '').trim();
@@ -469,6 +461,8 @@ async function handleMessage(sock, msg) {
     };
 
     const t0 = Date.now();
+    // Helper to clear typing indicator when done (always call after command)
+    const stopTyping = () => sock.sendPresenceUpdate('paused', jid).catch(() => {});
 
     // ────────────────────────────────────────────────────────────────────────
     switch (cmd) {
@@ -810,10 +804,20 @@ async function handleMessage(sock, msg) {
         }
     }
 
+    // Always clear the typing indicator once command finishes
+    stopTyping();
+
   } catch (err) {
     const m = err?.message || String(err);
+    const jid = msg?.key?.remoteJid;
+    // Always clear typing indicator even on error
+    if (jid) sock.sendPresenceUpdate('paused', jid).catch(() => {});
     if (!/ECONNRESET|EPIPE|not-acceptable|timed out|rate-overlimit/i.test(m)) {
-      console.error('[Handler]', m);
+      if (msg?.key?.remoteJid?.endsWith('@g.us')) {
+        console.error('[Group Handler]', msg.key.remoteJid, m);
+      } else {
+        console.error('[Handler]', m);
+      }
     }
   }
 }

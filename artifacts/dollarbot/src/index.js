@@ -6,7 +6,6 @@ const {
   makeCacheableSignalKeyStore,
   isJidBroadcast,
   Browsers,
-  makeInMemoryStore,
 } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const readline = require('readline');
@@ -18,6 +17,7 @@ const http = require('http');
 const { handleMessage, handleGroupParticipants } = require('./handler');
 const config = require('./config');
 const { extractBody } = require('./lib/messages');
+const { installSafeSend } = require('./lib/safe-send');
 
 const AUTH_DIR = path.join(__dirname, '../auth_info_baileys');
 const DATA_DIR = path.join(__dirname, '../data');
@@ -25,9 +25,51 @@ const DATA_DIR = path.join(__dirname, '../data');
 
 const logger = pino({ level: 'silent' });
 
-// ── In-memory message store with auto-cleanup ────────────────────────────
-const msgStore = makeInMemoryStore({ logger });
+// ── In-memory message store (makeInMemoryStore removed in Baileys 7.x) ──
+const msgStore = {
+  messages: {},
+  bind(ev) {
+    ev.on('messages.upsert', ({ messages: msgs }) => {
+      for (const m of msgs) {
+        if (!m.message || !m.key?.remoteJid) continue;
+        const jid = m.key.remoteJid;
+        if (!this.messages[jid]) this.messages[jid] = { array: [] };
+        if (!this.messages[jid].array.some(e => e.key.id === m.key.id))
+          this.messages[jid].array.push(m);
+      }
+    });
+    ev.on('messages.update', updates => {
+      for (const u of updates) {
+        const jid = u.key?.remoteJid;
+        if (!jid || !this.messages[jid]) continue;
+        const idx = this.messages[jid].array.findIndex(m => m.key.id === u.key.id);
+        if (idx >= 0 && u.update)
+          this.messages[jid].array[idx] = { ...this.messages[jid].array[idx], ...u.update };
+      }
+    });
+  },
+};
 global.msgStore = msgStore;
+const groupCache = new Map();
+
+function cacheGroup(group) {
+  if (!group?.id) return;
+  if (!Array.isArray(group.participants) || group.participants.length === 0) return;
+  groupCache.set(group.id, group);
+}
+
+async function getCachedGroupMetadata(sock, jid) {
+  const cached = groupCache.get(jid);
+  if (Array.isArray(cached?.participants) && cached.participants.length > 0) return cached;
+
+  try {
+    const fresh = await sock.groupMetadata(jid);
+    cacheGroup(fresh);
+    return fresh;
+  } catch {
+    return undefined;
+  }
+}
 
 // Clean up old messages every 5 minutes (prevents memory bloat)
 setInterval(() => {
@@ -140,9 +182,13 @@ async function startBot(method, phone) {
     console.log('\x1b[32mSession found — reconnecting...\x1b[0m\n');
   }
 
-  const sock = makeWASocket({
+  let sock;
+  sock = makeWASocket({
     version,
-    auth: state,
+    auth: {
+      creds: state.creds,
+      keys: makeCacheableSignalKeyStore(state.keys, logger),
+    },
     logger,
     printQRInTerminal: !usePairing,
     browser: ['Windows', 'Chrome', '125.0.6422.112'],
@@ -154,6 +200,7 @@ async function startBot(method, phone) {
     markOnlineOnConnect: true,
     syncFullHistory: false,
     fireInitQueries: true,
+    cachedGroupMetadata: async (jid) => getCachedGroupMetadata(sock, jid),
     getMessage: async (key) => {
       try {
         const stored = msgStore.messages[key.remoteJid];
@@ -169,9 +216,23 @@ async function startBot(method, phone) {
       return { conversation: '' };
     },
   });
+  installSafeSend(sock);
 
   // Bind store so it caches messages for group key retries
   msgStore.bind(sock.ev);
+
+  sock.ev.on('groups.upsert', groups => {
+    for (const group of groups || []) {
+      cacheGroup(group);
+    }
+  });
+
+  sock.ev.on('groups.update', groups => {
+    for (const group of groups || []) {
+      if (!group?.id) continue;
+      cacheGroup({ ...(groupCache.get(group.id) || {}), ...group });
+    }
+  });
 
   // ── Connection updates ───────────────────────────────────────────────────
   sock.ev.on('connection.update', async update => {
@@ -182,6 +243,16 @@ async function startBot(method, phone) {
       console.log('\x1b[32m╔══════════════════════════════╗\x1b[0m');
       console.log('\x1b[32m║   DOLLARBOT V5 ONLINE!       ║\x1b[0m');
       console.log('\x1b[32m╚══════════════════════════════╝\x1b[0m\n');
+      try {
+        const groups = await sock.groupFetchAllParticipating();
+        for (const group of Object.values(groups || {})) {
+          cacheGroup(group);
+        }
+        console.log(`[Groups] Cached ${groupCache.size} group(s).`);
+      } catch (e) {
+        console.log(`[Groups] Could not preload groups: ${e.message}`);
+      }
+
       // Notify all owner numbers
       for (const num of config.ownerNumbers) {
         try {
@@ -229,10 +300,14 @@ async function startBot(method, phone) {
     if (type !== 'notify') return;
     for (const m of messages) {
       if (!m.message) continue;
-      // Skip WhatsApp protocol/system stub messages (these cause "Waiting for
-      // this message. This may take a while." if processed incorrectly)
-      if (m.messageStubType) continue;
+      // Skip WhatsApp protocol/system stub messages
       const jid = m.key.remoteJid;
+      if (m.messageStubType) {
+        if (jid?.endsWith('@g.us')) {
+          console.log('[Group Stub]', jid, m.messageStubType, m.messageStubParameters?.join(' | ') || '');
+        }
+        continue;
+      }
 
       // Always process status@broadcast (for auto-like)
       if (jid === 'status@broadcast') {
@@ -243,11 +318,9 @@ async function startBot(method, phone) {
         if (!exists) {
           msgStore.messages['status@broadcast'].array.push(m);
         }
-        // Add reply method for status messages
         m.reply = async (text, options = {}) => {
           return sock.sendMessage(jid, { text, ...options }, { quoted: m });
         };
-        // Non-blocking auto-like
         handleMessage(sock, m).catch(err => {
           if (!/ECONNRESET|EPIPE/i.test(err.message)) console.log('[Status Error]', err.message);
         });
@@ -255,6 +328,15 @@ async function startBot(method, phone) {
       }
 
       const body = extractBody(m);
+
+      if (jid?.endsWith('@g.us') && body.trim().startsWith(config.prefix)) {
+        console.log('[Group Command]', {
+          jid,
+          fromMe: !!m.key.fromMe,
+          participant: m.key.participant,
+          body: body.trim().slice(0, 80),
+        });
+      }
 
       // For fromMe messages: only allow if they start with prefix (owner commands)
       // OR if it's a DM to self (owner chatting with themselves — bot responds)
@@ -285,6 +367,9 @@ async function startBot(method, phone) {
   });
 
   sock.ev.on('group-participants.update', async update => {
+    if (update?.id) {
+      try { cacheGroup(await sock.groupMetadata(update.id)); } catch (_) {}
+    }
     await handleGroupParticipants(sock, update);
   });
 
