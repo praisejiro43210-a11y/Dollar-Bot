@@ -2,17 +2,16 @@ const pollinations = require('../lib/pollinations');
 const memory = require('../lib/memory');
 const fetch = require('node-fetch');
 
-// ── Groq API call helper ──────────────────────────────────────────────────
-const GROQ_KEYS = [
-  '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',
-  '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',
-];
+// ── Groq API call helper (Render env, no hardcoded keys) ────────────────
+const env = require('../env');
+const GROQ_KEYS = env.GROQ_KEYS || [];
 let groqKeyIdx = 0;
 function nextGroqKey() {
   const k = GROQ_KEYS[groqKeyIdx % GROQ_KEYS.length];
   groqKeyIdx++;
   return k;
 }
+
 
 async function groqRequest(body, maxRetries = 2) {
   for (let i = 0; i < maxRetries; i++) {
