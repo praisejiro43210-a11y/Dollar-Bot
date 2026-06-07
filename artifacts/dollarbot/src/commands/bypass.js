@@ -229,19 +229,32 @@ async function checkBypassIntercept(sock, msg, jid) {
     // When someone "saves" a sticker, WA sends a sticker message quoting the original sticker.
     // We intercept that and warn.
     if (state.noSaveSticker && isSticker) {
-      const ctxInfo = msgContent.stickerMessage?.contextInfo;
-      const quotedIsSticker = !!(ctxInfo?.quotedMessage?.stickerMessage);
-      if (quotedIsSticker) {
+      // WhatsApp “save/steal” usually comes as a sticker message that QUOTES the original sticker.
+      // Some clients also send it as stickerMessage contextInfo with quotedMessage.
+      const stickerCtx = msgContent.stickerMessage?.contextInfo || {};
+      const quoted = stickerCtx?.quotedMessage || null;
+
+      const quotedIsSticker = !!(quoted?.stickerMessage);
+
+      // Also treat “replying with a sticker context” as a save attempt.
+      // (This fixes cases where ctxInfo path differs.)
+      const hasQuotedStickerContext =
+        quotedIsSticker ||
+        !!stickerCtx?.quotedMessage?.imageMessage ||
+        !!stickerCtx?.quotedMessage?.videoMessage;
+
+      if (quotedIsSticker || hasQuotedStickerContext) {
         try { await sock.sendMessage(jid, { delete: msg.key }); } catch (_) {}
         try {
           await sock.sendMessage(jid, {
-            text: `🔒 @${senderBare} sticker saving is *disabled* in this group by the admin.`,
+            text: `🚫 @${senderBare} sticker saving/stealing is *disabled* in this group by the admin.`,
             mentions: [senderRaw],
           });
         } catch (_) {}
         return true;
       }
     }
+
   } catch (_) {}
 
   return false;

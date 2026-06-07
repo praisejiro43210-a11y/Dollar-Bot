@@ -1,0 +1,9 @@
+- Inspect existing command wiring for .movie/.song/.video in handler.js and premium.js
+- Implement .movie in premium.js using Serper first, then Google Custom Search fallback
+- Extract trailer short video URL (prefer YouTube) and send using existing .video/mp4 approach
+- Generate text summary + rating via pollinations.textGenerate with extracted info
+- Fix .song sending method: send WhatsApp-compatible audio (audio buffer or correct mimetype)
+- Add sticker robustness fixes if ffmpeg/input validation fails (may require lib/sticker.js guards)
+- Wire .movie command into handler.js switch
+- Smoke test commands: .movie, .song, .sticker, .toimage, .steal
+

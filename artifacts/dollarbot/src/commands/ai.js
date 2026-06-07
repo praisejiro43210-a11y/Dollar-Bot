@@ -4,8 +4,8 @@ const fetch = require('node-fetch');
 
 // ── Groq API call helper ──────────────────────────────────────────────────
 const GROQ_KEYS = [
-  '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',
-  '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',
+  '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',
+  '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',
 ];
 let groqKeyIdx = 0;
 function nextGroqKey() {
@@ -155,7 +155,7 @@ const aiCommands = {
     await msg.reply('_Fetching weather..._');
     try {
       const result = await pollinations.getWeather(args.join(' '));
-      await msg.reply(`*Weather*\n\n${result}\n\n_Powered by DollarBot_`);
+      await msg.reply(`*Weather*\n\n${result}\n\n_ DollarBot_`);
     } catch (e) { await msg.reply(`Weather Error: ${e.message}`); }
   },
 
@@ -290,7 +290,7 @@ const aiCommands = {
           `┃ Last *${lines.length} messages* analyzed\n` +
           `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
           `${summaryText}\n\n` +
-          `_⚡ Powered by Groq AI_`
+          `_⚡ Powered by Dollar AI_`
         );
       } catch (e) {
         await msg.reply(`❌ Summary failed: ${e.message}`);
@@ -393,7 +393,7 @@ const aiCommands = {
         `┃ Last *${count} messages* analyzed\n` +
         `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
         `${summaryText}\n\n` +
-        `_⚡ Powered by Groq AI_`
+        `_⚡ Powered by Dollar AI_`
       );
     } catch (e) {
       await msg.reply(`❌ Summary failed: ${e.message}`);

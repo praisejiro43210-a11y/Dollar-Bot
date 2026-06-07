@@ -251,12 +251,25 @@ const CMD_EMOJIS = {
   song:'🎵', video:'🎥', enhance:'✨', ship:'💞', waifu:'🌸', neko:'🐱', crypto:'💰',
 };
 
+function getCmdEmoji(cmd) {
+  const emojiFromMap = CMD_EMOJIS[cmd];
+  if (emojiFromMap) return emojiFromMap;
+
+  // Fallback: stable “different emoji per command” using a hash
+  const fallback = ['💵','🤖','✨','⚡','🔥','💎','🧠','🧩','🎯','🎲','🧹','🔒','🔓','📌','📡','🧬','🎭','📸','🗑️','🕵️','🦾','🧪','🌍','🪙'];
+  let h = 0;
+  const s = String(cmd);
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return fallback[h % fallback.length];
+}
+
 function reactToCmd(sock, msg, cmd) {
-  const emoji = CMD_EMOJIS[cmd] ?? '💵';
+  const emoji = getCmdEmoji(cmd);
   sock.sendMessage(msg.key.remoteJid, {
     react: { text: emoji, key: msg.key },
   }).catch(() => {});
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Menu
