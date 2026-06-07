@@ -1,13 +1,18 @@
 const fetch = require('node-fetch');
 const config = require('../config');
 const memory = require('./memory');
+const env = require('../env');
 
-// Groq API keys rotation
-const groqKeys = [
-  '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', // Ejiro (api2)
-  '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'  // Blessing (api3)
-];
+// Groq API keys rotation (from Render env)
+const groqKeys = env.GROQ_KEYS || [];
+
+// Safety: if env not provided, keep old behavior? (disabled)
+if (!groqKeys.length) {
+  console.warn('[AI] No GROQ_KEYS provided in env. Groq calls will fail and fallback will be used.');
+}
+
 let currentKeyIndex = 0;
+
 
 function getNextGroqKey() {
   const key = groqKeys[currentKeyIndex];
@@ -18,6 +23,24 @@ function getNextGroqKey() {
 // ── Core text generation (Groq → Pollinations fallback) ───────────────────
 async function textGenerate(messages, model = 'openai') {
   let groqError;
+
+  // If no GROQ keys provided, go straight to Pollinations
+  if (!groqKeys.length) {
+    console.log(`[AI] No GROQ_KEYS in env. Using Pollinations fallback...`);
+    const res = await fetch('https://text.pollinations.ai/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages,
+        model: 'openai',
+        seed: Math.floor(Math.random() * 99999),
+        private: true,
+      }),
+      timeout: 45000,
+    });
+    if (!res.ok) throw new Error('All AI services failed. Please try again.');
+    return (await res.text()).trim();
+  }
 
   // Try each API key in rotation
   for (let i = 0; i < groqKeys.length; i++) {
@@ -171,8 +194,10 @@ async function tts(text) {
 
   // Primary: Groq Orpheus TTS
   try {
-    const ejiroKey = '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';
+    const ejiroKey = env.GROQ_TTS_KEY || (groqKeys[0] || '');
+    if (!ejiroKey) throw new Error('Missing GROQ_TTS_KEY');
     const response = await fetch('https://api.groq.com/openai/v1/audio/speech', {
+
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

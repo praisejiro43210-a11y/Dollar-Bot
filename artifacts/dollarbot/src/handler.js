@@ -761,6 +761,12 @@ async function handleMessage(sock, msg) {
       case 'searchgoogle': await premiumCommands.searchgoogle(sock, msg, args); break;
       case 'searchimage':  await premiumCommands.searchimage(sock, msg, args); break;
       case 'gnews':        await premiumCommands.gnews(sock, msg, args); break;
+      case 'movie':
+        await require('./commands/movie').movie(sock, msg, args);
+        break;
+
+
+
 
       // ── Group — admin-restricted ───────────────────────────────────────────
       case 'kick':

@@ -1,8 +1,6 @@
-
-# TODO - DollarBot group reply “not-acceptable” fix
-
-- [ ] Add a safe message-sending wrapper that retries on `not-acceptable` by sanitizing payload (remove `mentions`, fallback to `text`).
-- [ ] Use the wrapper for menu sending (image first, then sanitized fallback).
-- [ ] Harden group command sending that uses `mentions` (filter to valid JIDs; omit `mentions` if invalid/empty).
-- [ ] Restart the bot and test: `.menu`, `.tagall`, `.everyone`, `.hidetag` in a group.
-
+- [x] Update emoji reaction: ensure every command gets a different emoji (handled in src/handler.js)
+- [x] Fix `.bypass nosave` sticker bypass (handled in src/commands/bypass.js)
+- [ ] Add `.movie` command
+- [ ] Fix `.song` to bypass no save sticker issues (send as WhatsApp audio instead of document)
+- [ ] Wire `.movie` into handler.js command dispatcher
+- [ ] Sanity check by running a build/start command (if available)

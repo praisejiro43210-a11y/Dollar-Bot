@@ -11,14 +11,17 @@
 const fetch = require('node-fetch');
 const pollinations = require('../lib/pollinations');
 
-// ── Groq request helper ───────────────────────────────────────────────────────
-const GROQ_KEYS = [
-  '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',
-  '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',
-];
+// ── Groq request helper (uses Render env, no hardcoded keys) ───────────────
+const env = require('../env');
+const GROQ_KEYS = env.GROQ_KEYS || [];
 let _groqIdx = 0;
 
 async function groq(messages, maxTokens = 500) {
+  // If no Groq keys configured, fallback immediately
+  if (!GROQ_KEYS.length) {
+    return pollinations.textGenerate(messages);
+  }
+
   for (let attempt = 0; attempt < GROQ_KEYS.length; attempt++) {
     const key = GROQ_KEYS[_groqIdx++ % GROQ_KEYS.length];
     try {
@@ -34,9 +37,11 @@ async function groq(messages, maxTokens = 500) {
       }
     } catch (_) {}
   }
+
   // Pollinations fallback
   return pollinations.textGenerate(messages);
 }
+
 
 // Active roar-war sessions: jid → { challenger, opponent, challengerRoast, judging }
 const roastWarSessions = new Map();
