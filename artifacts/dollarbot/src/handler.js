@@ -327,16 +327,17 @@ async function sendMenu(sock, jid, speedMs, quotedMsg) {
     `┃ .reverse .hotcheck .smartcheck\n` +
     `┃ .brainlevel .coolcheck .lovecheck\n` +
     `┃ .wouldyourather .neverhavei\n` +
-    `┃ .paranoia .sus .iq .cringe .simp\n` +
+    `┃ .paranoia .iq .cringe .simp\n` +
     `┃ .rizzmeter .slay .bully .thisorthat\n` +
-    `┃ .bodycount .conspiracy .superpower\n` +
-    `┃ .fortune .rap .genz .villain .hero\n` +
+    `┃ .bodycount .prank .conspiracy\n` +
+    `┃ .fortune .sus .superpower .rap\n` +
+    `┃ .genz .villain .hero\n` +
     `┃ .emojify .lovecalc .twotruth\n` +
     `┃ .darkhumor .advice2 .roastbattle\n` +
     `┃ .friendlevel .personality .challenge\n` +
     `┃ .rate .namemeaning .tonguetwister\n` +
     `┃ .roastself .mission .yesorno .factcat\n` +
-    `┃ .wotd .typingtest .pickup .prank\n` +
+    `┃ .wotd .typingtest .pickup\n` +
     `╰━━━━━━━━━━━━━━━━━━⬣\n\n` +
 
     `╭━━━〔 🎮 GAMES 〕━━━⬣\n` +

@@ -38,6 +38,8 @@ const config = {
     path.join(__dirname, '../assets/menu2.jpg'),
     path.join(__dirname, '../assets/menu3.jpg'),
     path.join(__dirname, '../assets/menu4.jpg'),
+      path.join(__dirname, '../assets/menu5.jpg'),
+        path.join(__dirname, '../assets/menu6.jpg'),
   ],
 
   // ── Search & YouTube API Credentials ──────────────────────────────────

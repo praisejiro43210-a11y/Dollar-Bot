@@ -20,33 +20,30 @@ function getNextGroqKey() {
   return key;
 }
 
-// ── Core text generation (Groq → Pollinations fallback) ───────────────────
+// ── Core text generation (Groq → Pollinations → Deepseek → HF → Mistral → Together) ──
 async function textGenerate(messages, model = 'openai') {
-  // Provider order (user request):
-  // Groq (main) → Pollinations → DeepSeek → HF(gpt2) → Mistral → Together
-  // If a provider fails, we move to the next one.
-  let lastErr = null;
+  // Helper: normalize OpenAI-like responses
+  function extractContent(data) {
+    const c = data?.choices?.[0]?.message?.content ?? data?.choices?.[0]?.text;
+    if (typeof c === 'string') return c.trim();
+    return '';
+  }
 
-  const tryPollinations = async () => {
-    const res = await fetch('https://text.pollinations.ai/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages,
-        model: 'openai',
-        seed: Math.floor(Math.random() * 99999),
-        private: true,
-      }),
-      timeout: 45000,
-    });
-    if (!res.ok) throw new Error(`Pollinations HTTP ${res.status}`);
-    return (await res.text()).trim();
-  };
+  async function tryProvider(name, fn) {
+    try {
+      const result = await fn();
+      if (result) return result;
+      console.log(`[AI] ${name} returned empty output`);
+    } catch (e) {
+      const msg = e?.message || String(e);
+      console.log(`[AI] ${name} failed: ${msg}`);
+    }
+    return '';
+  }
 
-  const tryGroq = async () => {
-    if (!groqKeys.length) throw new Error('Missing GROQ_KEYS');
-    let groqError = null;
-
+  // 1) Groq (rotation)
+  if (groqKeys.length) {
+    let groqLastErr = '';
     for (let i = 0; i < groqKeys.length; i++) {
       const apiKey = getNextGroqKey();
       try {
@@ -56,132 +53,129 @@ async function textGenerate(messages, model = 'openai') {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`,
           },
-          body: JSON.stringify({ messages, model: 'llama-3.1-8b-instant' }),
+          body: JSON.stringify({
+            model: 'llama-3.1-8b-instant',
+            messages,
+            max_tokens: 700,
+          }),
           timeout: 45000,
         });
-        if (res.ok) {
-          const data = await res.json();
-          return data.choices[0].message.content.trim();
+        if (!res.ok) {
+          groqLastErr = `HTTP ${res.status}: ${await res.text().catch(()=>'')}`;
+          continue;
         }
-        const errText = await res.text().catch(() => '');
-        groqError = `Groq HTTP ${res.status}: ${errText}`;
+        const data = await res.json();
+        const content = extractContent(data);
+        if (content) return content;
       } catch (e) {
-        groqError = e.message;
+        groqLastErr = e?.message || String(e);
       }
     }
-    throw new Error(groqError || 'Groq failed');
-  };
+    console.log(`[AI] Groq failed (${groqLastErr}).`);
+  } else {
+    console.log(`[AI] No GROQ_KEYS in env. Skipping Groq.`);
+  }
 
-  const tryDeepseek = async () => {
-    // DeepSeek chat completions: https://api.deepseek.com/chat/completions
-    // Their public endpoint often still expects an API key. Per user note “No API key needed for basic requests”
-    // so we attempt without key first.
+  // 2) Pollinations fallback (no key)
+  const pollinationsRes = await tryProvider('Pollinations', async () => {
+    const res = await fetch('https://text.pollinations.ai/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages,
+        model: model || 'openai',
+        seed: Math.floor(Math.random() * 99999),
+        private: true,
+      }),
+      timeout: 45000,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = (await res.text()).trim();
+    return text || '';
+  });
+  if (pollinationsRes) return pollinationsRes;
+
+  // 3) Deepseek (no key needed per your note, but API allows anonymous only for some tiers)
+  const deepseek = await tryProvider('Deepseek', async () => {
     const res = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'deepseek-chat',
         messages,
+        max_tokens: 700,
       }),
       timeout: 45000,
     });
-    if (!res.ok) throw new Error(`DeepSeek HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    return data.choices?.[0]?.message?.content?.trim() || '';
-  };
+    return extractContent(data);
+  });
+  if (deepseek) return deepseek;
 
-  const tryHFgpt2 = async () => {
-    // Hugging Face public inference: https://api-inference.huggingface.co/models/gpt2
-    // This endpoint expects a "prompt" rather than chat messages.
-    const prompt = messages
-      .map(m => `${m.role === 'user' ? 'User' : m.role === 'system' ? 'System' : 'Assistant'}: ${m.content}`)
-      .join('\n')
-      .slice(-1200);
-
+  // 4) HuggingFace public text generation (gpt2)
+  // IMPORTANT: Hugging Face public inference often needs an API token for reliability.
+  // This tries without a token as requested; it may still rate-limit.
+  const hf = await tryProvider('HF(gpt2)', async () => {
     const res = await fetch('https://api-inference.huggingface.co/models/gpt2', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ inputs: prompt }),
-      timeout: 45000,
-    });
-    if (!res.ok) throw new Error(`HF gpt2 HTTP ${res.status}`);
-    const data = await res.json();
-    const out = Array.isArray(data) ? data?.[0]?.generated_text : data?.generated_text;
-    if (!out) throw new Error('HF gpt2 returned empty');
-    // Return only the tail-ish to reduce repeated prompt
-    return String(out).slice(-900).trim();
-  };
-
-  const tryMistral = async () => {
-    // Mistral free tier: https://api.mistral.ai/v1/chat/completions
-    // Likely needs MISTRAL_API_KEY; we attempt with env fallback if present, else attempt without.
-    const apiKey = process.env.MISTRAL_API_KEY || '';
-    const headers = { 'Content-Type': 'application/json' };
-    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
-
-    const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
-      method: 'POST',
-      headers,
       body: JSON.stringify({
-        model: 'mistral-small-latest',
-        messages,
+        inputs: messages.map(m => `${m.role}: ${m.content}`).join('\n') + '\nassistant:',
+        parameters: { max_new_tokens: 200, do_sample: true, temperature: 0.8 },
       }),
       timeout: 45000,
     });
-    if (!res.ok) throw new Error(`Mistral HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    return data.choices?.[0]?.message?.content?.trim() || '';
-  };
+    // HF gpt2 returns an array with { generated_text }
+    const text = Array.isArray(data) ? (data[0]?.generated_text || '') : (data?.generated_text || '');
+    return String(text).trim();
+  });
+  if (hf) return hf;
 
-  const tryTogether = async () => {
-    // Together public endpoint: https://api.together.xyz/v1/completions
-    // This likely expects a key; attempt with env if present.
-    const apiKey = process.env.TOGETHER_API_KEY || '';
-    const headers = { 'Content-Type': 'application/json' };
-    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
-
-    const prompt = messages
-      .map(m => `${m.role === 'user' ? 'User' : m.role === 'system' ? 'System' : 'Assistant'}: ${m.content}`)
-      .join('\n');
-
-    const res = await fetch('https://api.together.xyz/v1/completions', {
+  // 5) Mistral
+  // Mistral API normally requires an Authorization header.
+  // This fallback attempts anonymous use; if it fails, it will continue.
+  const mistral = await tryProvider('Mistral', async () => {
+    const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
       method: 'POST',
-      headers,
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo',
-        prompt,
-        max_tokens: 512,
+        model: 'mistral-large-latest',
+        messages,
+        max_tokens: 700,
         temperature: 0.7,
       }),
       timeout: 45000,
     });
-    if (!res.ok) throw new Error(`Together HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    const out = data?.choices?.[0]?.text || data?.choices?.[0]?.message?.content;
-    if (!out) throw new Error('Together returned empty');
-    return String(out).trim();
-  };
+    return extractContent(data);
+  });
+  if (mistral) return mistral;
 
-  // Execute in order
-  const providers = [
-    tryGroq,
-    tryPollinations,
-    tryDeepseek,
-    tryHFgpt2,
-    tryMistral,
-    tryTogether,
-  ];
+  // 6) Together
+  const together = await tryProvider('Together', async () => {
+    const res = await fetch('https://api.together.xyz/v1/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'togethercomputer/llama-3-70b-instruct',
+        prompt: messages.map(m => `${m.role}: ${m.content}`).join('\n') + '\nassistant:',
+        max_tokens: 300,
+        temperature: 0.7,
+      }),
+      timeout: 45000,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    // Together completions return { choices:[{ text }] }
+    return extractContent(data);
+  });
+  if (together) return together;
 
-  for (const provider of providers) {
-    try {
-      const out = await provider();
-      if (out && out.trim().length) return out.trim();
-    } catch (e) {
-      lastErr = e;
-    }
-  }
-
-  throw new Error(`All AI services failed. ${lastErr ? lastErr.message : ''}`.trim());
+  throw new Error('All AI services failed. Please try again later.');
 }
 
 // ── AI Personas ───────────────────────────────────────────────────────────

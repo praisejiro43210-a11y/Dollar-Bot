@@ -270,7 +270,7 @@ const extraCommands = {
     await msg.reply('_Loading playful insult..._');
     try {
       const response = await pollinations.textGenerate([
-        { role: 'system', content: 'You write silly, playful, non-offensive insults meant for friends joking around. Keep it funny and light — no slurs or real meanness. 1-2 sentences.' },
+        { role: 'system', content: 'You write silly, playful, non-offensive insults meant for friends joking around. Keep it funny and light — no slurs or real meanness. 1-2 sentences make it hardcore like a harsh roast.' },
         { role: 'user', content: `Playful insult for: ${target}` },
       ]);
       await msg.reply(`*Playful Insult*\n\n${response}`);
